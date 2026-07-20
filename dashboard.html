@@ -1,0 +1,2239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DCM Headcount &amp; Movement Dashboard</title>
+  <!-- CDN libraries (SheetJS + Chart.js v4 + datalabels v2) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+    :root {
+      --hsbc-red: #db0011;
+      --hsbc-red-hover: #b8000e;
+      --hsbc-red-glow: rgba(219, 0, 17, 0.15);
+      --hsbc-black: #14161d;
+      --hsbc-orange: #fa6606;
+      --hsbc-indigo: #4349c3;
+      --hsbc-pink: #fb7185;
+      --hsbc-grey: #9ca3af;
+
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1;
+      --slate-400: #94a3b8;
+      --slate-500: #64748b;
+      --slate-600: #475569;
+      --slate-700: #334155;
+      --slate-800: #1e293b;
+      --slate-900: #0f172a;
+
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --ink: #0f172a;
+      --muted: #64748b;
+
+      --teal-500: #0d9488;
+      --blue-500: #2563eb;
+      --amber-500: #d97706;
+
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+      --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+      --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05);
+      
+      --radius: 12px;
+      --radius-lg: 16px;
+      
+      --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scrollbar-gutter: stable;
+    }
+    
+    body {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(165deg, #fdf2f2 0%, #fbe8e8 15%, #f5f0f0 35%, #f1f5f9 60%, #f8fafc 100%);
+      min-height: 100vh;
+      letter-spacing: -0.01em;
+    }
+
+    /* Header */
+    .hero {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background-color: #000000;
+      border-bottom: none;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+    
+    .hero-inner {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    
+    .logo {
+      width: 48px;
+      height: 24px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .logo svg {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .titles h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+    
+    .titles p {
+      margin: 2px 0 0;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.55);
+      font-weight: 400;
+    }
+    
+    .hero-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    
+    .btn {
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      background-color: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.85);
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    
+    .btn:hover {
+      background-color: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+    }
+    
+    .btn.primary {
+      background-color: var(--hsbc-red);
+      border-color: var(--hsbc-red);
+      color: #ffffff;
+    }
+    
+    .btn.primary:hover {
+      background-color: var(--hsbc-red-hover);
+      border-color: var(--hsbc-red-hover);
+      box-shadow: 0 4px 12px rgba(219, 0, 17, 0.2);
+    }
+    
+    .btn.ghost {
+      background-color: transparent;
+      border-color: transparent;
+      color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .btn.ghost:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.85);
+    }
+    
+    .status {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: 500;
+      background-color: rgba(255, 255, 255, 0.06);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      max-width: 520px;
+      text-align: right;
+    }
+    
+    /* Layout */
+    .layout {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    
+    .sidebar {
+      position: sticky;
+      top: 130px;
+      z-index: 10;
+    }
+    
+    .sidebar-card {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    
+    .sidebar-card h2 {
+      font-size: 15px;
+      font-weight: 700;
+      margin: 0;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      color: var(--slate-800);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .sidebar-card h2 .filter-icon {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      color: var(--hsbc-red);
+    }
+    
+    .filters-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-height: calc(100vh - 280px);
+      overflow-y: auto;
+    }
+    
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    
+    .field label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--slate-500);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .field select, .field input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--slate-200);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      background-color: var(--slate-50);
+      color: var(--slate-800);
+      /* transition: var(--transition); */
+    }
+    
+    .field select:hover, .field input:hover {
+      background-color: #ffffff;
+      border-color: var(--slate-300);
+    }
+    
+    .field select:focus, .field input:focus {
+      background-color: #ffffff;
+      border-color: var(--hsbc-red);
+      outline: none;
+      box-shadow: 0 0 0 3px var(--hsbc-red-glow);
+    }
+    
+    .field select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image: url("data:image/svg+xml;utf8,<svg fill='%2364748b' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 18px;
+      padding-right: 32px;
+    }
+    
+    .field-search input {
+      background-image: url("data:image/svg+xml;utf8,<svg fill='%2394a3b8' height='18' viewBox='0 0 24 24' width='18' xmlns='http://www.w3.org/2000/svg'><path d='M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z'/></svg>");
+      background-repeat: no-repeat;
+      background-position: 10px center;
+      background-size: 16px;
+      padding-left: 34px !important;
+    }
+    
+    .date-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    
+    .filters-foot {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      background-color: var(--slate-50);
+    }
+    
+    .filters-foot .btn {
+      width: 100%;
+      justify-content: center;
+      background-color: var(--hsbc-red);
+      border-color: var(--hsbc-red);
+      color: #ffffff;
+    }
+    
+    .filters-foot .btn:hover {
+      background-color: var(--hsbc-red-hover);
+      border-color: var(--hsbc-red-hover);
+      color: #ffffff;
+    }
+    
+    main {
+      min-width: 0;
+    }
+    
+    .page {
+      display: none;
+      animation: fade 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .page.active {
+      display: block;
+    }
+    
+    @keyframes fade {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    /* KPIs */
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    
+    .kpi {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      padding: 16px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    
+    .kpi:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    /* Only the primary (lead) KPI carries the HSBC red accent edge,
+       matching the reference dashboard where "Employees" is highlighted
+       while the remaining KPI cards stay neutral. */
+    .kpi.primary {
+      border-left: 4px solid var(--hsbc-red);
+    }
+    .kpi.secondary {
+      border-left: 4px solid var(--hsbc-black);
+    }
+    .kpi.tertiary {
+      border-left: 4px solid var(--hsbc-orange);
+    }
+    .kpi.quarternary {
+      border-left: 4px solid var(--hsbc-indigo);
+    }
+    
+    .kpi .k-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 6px 12px -4px rgb(0 0 0 / 0.35);
+    }
+    
+    .kpi .k-icon svg {
+      width: 21px;
+      height: 21px;
+      fill: #ffffff;
+    }
+
+    .kpi .k-body {
+      min-width: 0;
+    }
+    
+    .kpi.red .k-icon { background: radial-gradient(circle at 30% 28%, #ff3347, var(--hsbc-red) 70%); }
+    .kpi.black .k-icon { background: radial-gradient(circle at 30% 28%, #3a3f4c, var(--hsbc-black) 70%); }
+    .kpi.amber .k-icon { background: radial-gradient(circle at 30% 28%, #ff9142, var(--hsbc-orange) 70%); }
+    .kpi.blue .k-icon { background: radial-gradient(circle at 30% 28%, #6d72e0, var(--hsbc-indigo) 70%); }
+    
+    .kpi .k-label {
+      font-size: 10.5px;
+      color: var(--slate-500);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    
+    .kpi .k-val {
+      font-size: 26px;
+      font-weight: 800;
+      margin-top: 2px;
+      color: var(--slate-900);
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+    
+    .kpi .k-note {
+      font-size: 10.5px;
+      color: var(--slate-400);
+      margin-top: 3px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    /* Chart grid */
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    
+    .chart-card {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 24px;
+      transition: var(--transition);
+    }
+    
+    .chart-card:hover {
+      box-shadow: var(--shadow-md);
+    }
+    
+    .chart-card .c-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--slate-800);
+      margin: 0 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .chart-year-select {
+      padding: 6px 28px 6px 10px;
+      border: 1px solid var(--slate-200);
+      border-radius: 7px;
+      background-color: var(--slate-50);
+      color: var(--slate-700);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    
+    .chart-box {
+      position: relative;
+      height: 300px;
+    }
+    
+    .chart-box.tall {
+      height: 340px;
+    }
+    
+    /* Chart multiselect */
+    .ym-wrap {
+      position: relative;
+    }
+    
+    .ym-btn {
+      font-size: 12px;
+      font-weight: 600;
+      background-color: var(--slate-100);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      color: var(--slate-700);
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .ym-btn::after {
+      content: "";
+      display: inline-block;
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 4px solid var(--slate-500);
+      vertical-align: middle;
+    }
+    
+    .ym-btn:hover {
+      background-color: var(--slate-200);
+      color: var(--slate-900);
+    }
+    
+    .ym-panel {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 4px);
+      z-index: 100;
+      background-color: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-lg);
+      padding: 6px;
+      min-width: 140px;
+      max-height: 220px;
+      overflow-y: auto;
+      display: none;
+      animation: slideDown 0.15s ease-out;
+    }
+    
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .ym-panel.open {
+      display: block;
+    }
+    
+    .ym-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--slate-700);
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    
+    .ym-item:hover {
+      background-color: var(--slate-100);
+      color: var(--slate-900);
+    }
+    
+    .ym-item input[type="checkbox"] {
+      accent-color: var(--hsbc-red);
+      cursor: pointer;
+    }
+
+    /* Filter Year Multiselect */
+    .filter-ym-wrap {
+      position: relative;
+      width: 100%;
+    }
+    .filter-ym-btn {
+      width: 100%;
+      min-height: 40px;
+      padding: 10px 12px;
+      border: 1px solid var(--slate-200);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      background-color: var(--slate-50);
+      color: var(--slate-800);
+      transition: var(--transition);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-align: left;
+    }
+    .filter-ym-btn:hover,
+    .filter-ym-btn:focus-visible,
+    .filter-ym-wrap:has(.filter-ym-panel.open) .filter-ym-btn {
+      background-color: #ffffff;
+      border-color: var(--slate-300);
+    }
+    .filter-ym-btn:focus-visible {
+      outline: 2px solid rgba(219, 0, 17, 0.22);
+      outline-offset: 2px;
+    }
+    .filter-ym-btn::after {
+      content: "";
+      display: inline-block;
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 4px solid var(--slate-500);
+      margin-left: 8px;
+    }
+    .filter-ym-panel {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+      z-index: 100;
+      background-color: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-lg);
+      padding: 6px;
+      max-height: 220px;
+      overflow-y: auto;
+      display: none;
+      animation: slideDown 0.15s ease-out;
+    }
+    .filter-ym-panel.open {
+      display: block;
+    }
+
+    .filter-ym-panel .ym-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      width: 100%;
+      justify-items: start;
+      justify-content: start;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      text-align: left;
+      transform: none;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .filter-ym-panel .ym-item:hover {
+      transform: none;
+    }
+
+    .filter-ym-panel .ym-item input[type="checkbox"] {
+      flex: 0 0 auto;
+      margin: 0;
+    }
+
+    .filter-ym-panel .ym-item:has(input:checked) {
+      background-color: rgba(219, 0, 17, 0.06);
+      color: var(--hsbc-red);
+      font-weight: 600;
+    }
+
+    /* Single-select dropdown items (Business View, GCB, Team, etc.) styled
+       to match the Year filter's multiselect items above: same hover and
+       selected-state colours for a consistent filter panel language. */
+    .filter-ym-panel .f-opt {
+      display: block;
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--slate-700);
+      cursor: pointer;
+      text-align: left;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .filter-ym-panel .f-opt:hover {
+      background-color: var(--slate-100);
+      color: var(--slate-900);
+    }
+
+    .filter-ym-panel .f-opt.selected {
+      background-color: rgba(219, 0, 17, 0.06);
+      color: var(--hsbc-red);
+      font-weight: 600;
+    }
+    
+    /* Responsive Adjustments */
+    @media (max-width: 1180px) {
+      .layout {
+        grid-template-columns: 1fr;
+        padding: 16px;
+      }
+      .sidebar {
+        position: static;
+      }
+      .filters-body {
+        max-height: none;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 16px;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .hero-inner {
+        padding: 16px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .hero-actions {
+        align-items: flex-start;
+        width: 100%;
+      }
+      .btn-row {
+        width: 100%;
+      }
+      .btn {
+        flex: 1;
+        justify-content: center;
+      }
+      .status {
+        width: 100%;
+        text-align: left;
+      }
+      .kpis {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .grid2 {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .kpis {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ====== HEADER ==== -->
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="brand">
+        <!-- Corrected HSBC Logo SVG -->
+        <div class="logo">
+          <svg viewBox="0 0 170.1 85.1" xmlns="http://www.w3.org/2000/svg">
+            <rect x="42.6" y="0" width="85" height="85.1" fill="#ffffff"/>
+            <polygon points="170.1,42.6 127.6,0 127.6,85.1" fill="#db0011"/>
+            <polygon points="85.1,42.6 127.6,0 42.6,0" fill="#db0011"/>
+            <polygon points="0,42.6 42.6,85.1 42.6,0" fill="#db0011"/>
+            <polygon points="85.1,42.6 42.6,85.1 127.6,85.1" fill="#db0011"/>
+          </svg>
+        </div>
+        <div class="titles">
+          <h1>DCM Headcount &amp; Movement Dashboard</h1>
+          <p>Workforce Overview &amp; Movement Insights</p>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <div class="btn-row">
+          <button class="btn primary" id="btnSelect">
+            <svg fill="currentColor" height="14" viewBox="0 0 28 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+            Select HC File
+          </button>
+          <button class="btn" id="btnRefresh" style="display: none">
+            <svg fill="currentColor" height="14" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            Refresh
+          </button>
+          <button class="btn ghost" id="btnReset">Reset Filters</button>
+        </div>
+        <div class="status" id="statusText">Please select an Excel file to begin.</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- ====== BODY ==== -->
+    <!-- SIDEBAR / FILTERS -->
+    <aside class="sidebar">
+      <div class="sidebar-card">
+        <h2>
+          <svg class="filter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v2l-7 7v5l-4 2v-7L3 7V5z"/></svg>
+          Filters
+        </h2>
+        <div class="filters-body">
+          <div class="field">
+            <label>Year</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_year_btn" aria-expanded="false" aria-controls="f_year_panel">Select Years</button>
+              <div class="filter-ym-panel" id="f_year_panel"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Business View</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_businessView_btn" aria-expanded="false" aria-controls="f_businessView_panel">All</button>
+              <div class="filter-ym-panel" id="f_businessView_panel"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>GCB</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_gcb_btn" aria-expanded="false" aria-controls="f_gcb_panel">All</button>
+              <div class="filter-ym-panel" id="f_gcb_panel"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>DCM HC?</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_dcmHc_btn" aria-expanded="false" aria-controls="f_dcmHc_panel">All</button>
+              <div class="filter-ym-panel" id="f_dcmHc_panel"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Consolidated Region</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_consolidatedRegion_btn" aria-expanded="false" aria-controls="f_consolidatedRegion_panel">All</button>
+              <div class="filter-ym-panel" id="f_consolidatedRegion_panel"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Country</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_country_btn" aria-expanded="false" aria-controls="f_country_panel">All</button>
+              <div class="filter-ym-panel" id="f_country_panel"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Team</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_team_btn" aria-expanded="false" aria-controls="f_team_panel">All</button>
+              <div class="filter-ym-panel" id="f_team_panel"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Movement Type</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_movementType_btn" aria-expanded="false" aria-controls="f_movementType_panel">All</button>
+              <div class="filter-ym-panel" id="f_movementType_panel"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>FO/Non-FO</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_fo_btn" aria-expanded="false" aria-controls="f_fo_panel">All</button>
+              <div class="filter-ym-panel" id="f_fo_panel"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Gender</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_gender_btn" aria-expanded="false" aria-controls="f_gender_panel">All</button>
+              <div class="filter-ym-panel" id="f_gender_panel"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>In/Out</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_inOut_btn" aria-expanded="false" aria-controls="f_inOut_panel">All</button>
+              <div class="filter-ym-panel" id="f_inOut_panel"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Move Date Range</label>
+            <div class="date-row">
+              <input type="date" id="f_dateFrom" title="Move Date From" />
+              <input type="date" id="f_dateTo" title="Move Date To" />
+            </div>
+          </div>
+          <div class="field field-search"> <label>Employee Search</label><input type="text" id="f_search" placeholder="Name, email, ID, role..." /></div>
+        </div>
+        <div class="filters-foot">
+          <button class="btn primary" id="btnClear">Clear Filters</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main>
+      <section class="page active" id="dashboard">
+        <div class="kpis">
+          <div class="kpi red primary">
+            <div class="k-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="k-body"><div class="k-label">Employees</div><div class="k-val" id="kpi_emp">0</div><div class="k-note">Unique Employee IDs</div></div>
+          </div>
+          <div class="kpi black secondary ">
+            <div class="k-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg></div>
+            <div class="k-body"><div class="k-label">FTE</div><div class="k-val" id="kpi_fte">0</div><div class="k-note">Employees with FTE = 1</div></div>
+          </div>
+          <div class="kpi amber tertiary">
+            <div class="k-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg></div>
+            <div class="k-body"><div class="k-label">Exits / Leavers</div><div class="k-val" id="kpi_exits">0</div><div class="k-note">Ignores DCM HC? filter</div></div>
+          </div>
+          <div class="kpi blue quarternary">
+            <div class="k-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm7 6c-1.65 0-3-1.35-3-3V5h6v6c0 1.65-1.35 3-3 3zm7-6c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg></div>
+            <div class="k-body"><div class="k-label">Promoted</div><div class="k-val" id="kpi_promoted">0</div><div class="k-note">Promoted in year Yes</div></div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="chart-card"><div class="c-title">GCB Distribution by Region</div><div class="chart-box tall"><canvas id="c_gcb"></canvas></div></div>
+          <div class="chart-card"><div class="c-title">Year-wise Employee Count by Consolidated Region</div><div class="chart-box"><canvas id="c_yearwise"></canvas></div></div>
+          <div class="chart-card">
+            <div class="c-title">
+              <span>Movement Type by Consolidated Region</span>
+              <span class="ym-wrap">
+                <button class="ym-btn" id="movementRegionTypeBtn" aria-expanded="false" aria-controls="movementRegionTypePanel">Movement Types</button>
+                <div class="ym-panel" id="movementRegionTypePanel"></div>
+              </span>
+            </div>
+            <div class="chart-box"><canvas id="c_movement_region"></canvas></div>
+          </div>
+          <div class="chart-card"><div class="c-title">Gender wise Employee Count Across Years</div><div class="chart-box"><canvas id="c_gender_years"></canvas></div></div>
+          <div class="chart-card">
+            <div class="c-title">
+              <span>Movement Type Distribution</span>
+              <span class="ym-wrap">
+                <button class="ym-btn" id="movementDistTypeBtn" aria-expanded="false" aria-controls="movementDistTypePanel">Movement Types</button>
+                <div class="ym-panel" id="movementDistTypePanel"></div>
+              </span>
+            </div>
+            <div class="chart-box"><canvas id="c_movement"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="c-title">
+              <span>Movement Type Waterfall</span>
+              <select class="chart-year-select" id="waterfallYear" aria-label="Waterfall chart year"></select>
+            </div>
+            <div class="chart-box"><canvas id="c_movement_waterfall"></canvas></div>
+          </div>
+          <div class="chart-card"><div class="c-title">Team wise Employee Count Across Years</div><div class="chart-box"><canvas id="c_team_years"></canvas></div></div>
+          <div class="chart-card"><div class="c-title">Countries by Employer Count</div><div class="chart-box"><canvas id="c_country"></canvas></div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Fallback file input (non-Chrome/Edge browsers) -->
+  <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none" />
+
+  <script>
+    // Column aliasing + normalisation
+    const COLUMN_ALIASES = {
+      businessView: ["Business View"],
+      year: ["Year"],
+      employeeId: ["Employee ID"],
+      employeeName: ["Employee Name"],
+      employeeEmail: ["Employee Email Address", "Employee Email"],
+      gcb: ["GCB"],
+      fte: ["FTE"],
+      dcmHc: ["DCM HC?"],
+      consolidatedRegion: ["Consolidated Region"],
+      country: ["Work Location Country Name", "Country"],
+      gender: ["Gender"],
+      fo: ["FO?"],
+      role: ["Role"],
+      team: ["Team"],
+      subTeam: ["Sub-Team","Sub Team"],
+      inOut: ["In/Out"],
+      movementType: ["Movement Type"],
+      moveDate: ["Move Date"],
+      promoted: ["Promoted in the Year?", "Promoted in Year?"]
+    };
+
+    function normalizeHeader(h){ return String (h==null?"": h).toLowerCase().replace(/[^a-z0-9]/g,""); }
+    function findHeaderKey(headers, aliases) {
+      const norm = headers.map(h => [normalizeHeader(h), h]);
+      for(const alias of aliases) {
+        const na = normalizeHeader(alias);
+        const hit = norm.find(([n]) => n === na);
+        if(hit) return hit[1];
+      }
+      // loose fallback: header contains alias
+      for(const alias of aliases){
+        const na = normalizeHeader(alias);
+        const hit = norm.find(([n]) => n.includes(na) && na.length>2);
+        if(hit) return hit[1];
+      }
+      return null;
+    }
+
+    function safeText(v) { return v==null?"": String(v).trim(); }
+    function cleanNumber(v) {
+      if(v ==null || v=== "") return null;
+      if(typeof v === "number") return v;
+      const n = parseFloat(String (v).replace(/[,]/g,""));
+      return isNaN(n) ? null: n;
+    }
+    function cleanYear(v) {
+      if(v ==null || v==="") return "";
+      if(v instanceof Date && !isNaN(v)) return v.getUTCFullYear();
+      const f = parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
+      if(!isNaN(f)) {
+        const y = Math.round(f);
+        if(y >= 1900 && y <= 2100) return y;
+      }
+      return "";
+    }
+    function toISO(d){
+      const y=d.getUTCFullYear(), m=String(d.getUTCMonth()+1).padStart(2,"0"), day=String(d.getUTCDate()).padStart(2,"0");
+      return `${y}-${m}-${day}`;
+    }
+    function parseExcelDate(v) {
+      if(v==null || v==="") return "";
+      if(v instanceof Date && !isNaN(v)) return toISO(v);
+      if(typeof v==="number"){
+        // Excel serial (25569 = 1970-01-01)
+        const d = new Date(Math.round((v-25569) *86400*1000));
+        if(!isNaN(d)) return toISO(d);
+      }
+      const s = String(v).trim();
+      let m;
+      // dd/mm/yyyy or mm/dd/yyyy (best-effort, defaults to dd/mm)
+      if((m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/))){
+        let a=+m[1], b=+m[2], y=+m[3];
+        if(y<100) y+=2000;
+        let day, mon;
+        if(a>12){ day=a; mon=b; } else if(b>12){ day=b; mon=a; } else { day=a; mon=b; }
+        const d = new Date(Date.UTC(y, mon-1, day));
+        if(!isNaN(d)) return toISO(d);
+      }
+      // yyyy-mm-dd
+      if((m = s.match(/^(\d{4})[\/\-\s](\d{1,2})[\/\-.](\d{1,2})$/))){
+        const d = new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
+        if(!isNaN(d)) return toISO(d);
+      }
+      const d = new Date(s);
+      if(!isNaN(d)) return toISO(d);
+      return "";
+    }
+
+    function normalizeRows(rows){
+      if(!rows || !rows.length) return [];
+      const headerSet = new Set();
+      rows.slice(0,10).forEach(r => Object.keys(r).forEach (k => headerSet.add(k)));
+      const headers = [...headerSet];
+      const map = {};
+      for(const ck in COLUMN_ALIASES) map[ck] = findHeaderKey(headers, COLUMN_ALIASES[ck]);
+      const out = rows.map(row => {
+        const o={};
+        for(const ck in COLUMN_ALIASES) {
+          const hk = map[ck];
+          const raw = (hk!=null) ? row[hk]: null;
+          if(ck==="year") o[ck] = cleanYear(raw);
+          else if(ck==="fte") o[ck] = cleanNumber(raw);
+          else if(ck==="moveDate") o[ck] = parseExcelDate(raw);
+          else o[ck] = safeText(raw);
+        }
+        return o;
+      });
+      // keep rows that have at least a name /id/ email
+      return out.filter(r => r.employeeName || r.employeeId || r.employeeEmail);
+    }
+
+    // Global state
+    const FILTER_FIELDS = ["year", "businessView", "gcb", "dcmHc", "consolidatedRegion", "country", "team", "movementType", "fo", "gender", "inOut"];
+    const SIMPLE_FILTER_FIELDS = FILTER_FIELDS.filter(f => f !== "year");
+    
+    // Shared chart colours. The alias keeps the existing chart configuration
+    // concise while the varied palette below restores the original visual style.
+    const CHART_THEME = Object.freeze({
+      red: "#db0011",
+      black: "#0f172a",
+      richBlack: "#14161d",
+      indigo: "#4349c3",
+      grey8: "#475569",
+      grey7: "#64748b",
+      grey6: "#4b5563",
+      grid: "rgba(226, 232, 240, 0.6)",
+      white: "#fff"
+    });
+    const HSBC_CHART_COLORS = CHART_THEME;
+    // Ordered to match the HSBC reference dashboard: the first four entries
+    // are the confirmed brand colours for Americas / Asia Pacific / Europe /
+    // MENA (red, near-black, grey, salmon-pink) since consolidatedRegion is
+    // alphabetical and always lands on these first. Remaining entries are a
+    // muted, corporate-toned extension for dimensions with more categories
+    // (movement type, team, etc.).
+    const PALETTE = [
+      "#db0011", // Red        (Americas)
+      "#14161d", // Rich Black (Asia Pacific)
+      "#9ca3af", // Slate Grey (Europe)
+      "#fb7185", // Salmon Pink(MENA)
+      "#4349c3", // Indigo
+      "#0d9488", // Teal
+      "#d97706", // Amber / Gold
+      "#7c3aed", // Purple
+      "#9f1239", // Deep Rose / Maroon
+      "#0891b2", // Cyan
+      "#64748b", // Slate 500
+      "#be185d"  // Magenta
+    ];
+
+    // Consistent corner rounding applied to every bar chart dataset.
+    const BAR_RADIUS = 6;
+
+    const state = {
+      raw: [],
+      filtered: [],
+      charts: {},
+      categoryColorOrders: {},
+      filters: {},
+      movementRegionSelectedTypes: null,
+      movementDistSelectedTypes: null,
+      waterfallYear: null,
+      lastFileHandle: null,
+      _busy: false
+    };
+
+    function uidOf(r) { return r.employeeId || r.employeeEmail || r.employeeName || Math.random().toString(36); }
+    function uniqueYears(data) { return [...new Set (data.map(r=>r.year).filter(y=>y!=="" && y!=null))].map(Number); }
+    function escapeHtml(v) { return String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+    function setStatus(t){ document.getElementById("statusText").textContent = t; }
+
+    // Build the color order from the unfiltered data, rather than a chart's
+    // current filtered/sorted categories. A category therefore keeps its colour
+    // as filters reveal or hide neighbouring categories.
+    function categoryColor(dimension, category) {
+      const label = String(category ?? "").trim();
+      if(!label) return HSBC_CHART_COLORS.grey6;
+      const categories = state.categoryColorOrders[dimension] ||= [...new Set(state.raw
+        .map(row=>String(row[dimension] ?? "").trim())
+        .filter(Boolean))]
+        .sort((a,b)=>a.localeCompare(b));
+      const index = categories.indexOf(label);
+      if(index >= 0) return PALETTE[index % PALETTE.length];
+
+      // A deterministic fallback protects charts if a caller supplies a label
+      // which is not present in the source data.
+      const key = `${dimension}:${label}`;
+      const hash = [...key].reduce((value, character)=>(value * 31 + character.charCodeAt(0)) >>> 0, 0);
+      return PALETTE[hash % PALETTE.length];
+    }
+
+    // Filtering
+    function applyFilters(data, f, excludeKey) {
+      const df=f.moveDateFrom, dt=f.moveDateTo, q=(f.search||"").toLowerCase().trim();
+      return data.filter(r=>{
+        for(const field of FILTER_FIELDS) {
+          if(field===excludeKey) continue;
+          const val = f[field];
+          if(field==="year") {
+            if(Array.isArray(val)) {
+              if (val.length === 0) return false;
+              if(!val.includes(Number(r[field])) && !val.includes(String(r[field]))) return false;
+            }
+          } else {
+            if(val && val!=="All") { if(String(r[field]??"")!==String(val)) return false; }
+          }
+        }
+        if(df) { if(!r.moveDate || r.moveDate < df) return false; }
+        if(dt) { if(!r.moveDate || r.moveDate > dt) return false; }
+        if(q) {
+          const hay = [r.employeeName,r.employeeEmail,r.employeeId, r.role, r.team,r.subTeam,r.country,r.businessView].map(x=>String(x||"").toLowerCase()).join("");
+          if(!hay.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function resolveDcmDefault(){
+      const vals = new Set(state.raw.map(r=>String(r.dcmHc||"").trim()));
+      if([...vals].some(v=>/^yes$/i.test(v))) return [...vals].find(v=>/^yes$/i.test(v));
+      if([...vals].some(v=>/^y$/i.test(v))) return [...vals].find(v=>/^y$/i.test(v));
+      return "All";
+    }
+
+    // Data grouping helpers
+    function uniqueCount(records, pred) {
+      const s=new Set();
+      for(const r of records) { if(pred(r)) s.add(uidOf(r)); }
+      return s.size;
+    }
+
+    function groupUnique(records, field) {
+      const m = new Map();
+      for(const r of records) {
+        const k = String(r[field]??"").trim(); if(k==="") continue;
+        if(!m.has(k)) m.set(k, new Set());
+        m.get(k).add(uidOf(r));
+      }
+      return [...m.entries()].map(([k,s])=>[k,s.size]);
+    }
+
+    function groupCountRows(records, field){
+      const m = new Map();
+      for(const r of records) { const k = String(r[field]??"").trim(); if(!k) continue; m.set(k, (m.get(k)||0)+1); }
+      return [...m.entries()];
+    }
+
+    // Filter UI update (cascading)
+    function readFiltersFromDOM(){
+      state.filters.moveDateFrom=document.getElementById("f_dateFrom").value ||"";
+      state.filters.moveDateTo=document.getElementById("f_dateTo").value||"";
+      state.filters.search=document.getElementById("f_search").value||"";
+    }
+
+    function closeAllSimpleFilterPanels(){
+      SIMPLE_FILTER_FIELDS.forEach(field=>{
+        const panel=document.getElementById("f_"+field+"_panel");
+        const btn=document.getElementById("f_"+field+"_btn");
+        if(panel) panel.classList.remove("open");
+        if(btn) btn.setAttribute("aria-expanded","false");
+      });
+    }
+
+    function renderSimpleFilterPanel(field, opts, cur){
+      const panelEl = document.getElementById("f_"+field+"_panel");
+      const btnEl = document.getElementById("f_"+field+"_btn");
+      if(panelEl){
+        const allOpts=["All", ...opts];
+        panelEl.innerHTML = allOpts.map(v=>
+          `<div class="f-opt${v===cur?" selected":""}" data-value="${escapeHtml(v)}">${escapeHtml(v)}</div>`
+        ).join("");
+        panelEl.querySelectorAll(".f-opt").forEach(item=>{
+          item.addEventListener("click", ()=>{
+            state.filters[field]=item.getAttribute("data-value");
+            panelEl.classList.remove("open");
+            if(btnEl) btnEl.setAttribute("aria-expanded","false");
+            refresh(true);
+          });
+        });
+      }
+      if(btnEl) btnEl.textContent = cur;
+    }
+
+    function updateFilterOptions() {
+      for(const field of FILTER_FIELDS) {
+        const subset=applyFilters(state.raw, state.filters, field);
+        if(field==="year"){
+          const opts=uniqueYears(state.raw).sort((a,b)=>b-a);
+          if(!Array.isArray(state.filters.year)){
+            const allYears = uniqueYears(state.raw).sort((a,b)=>a-b);
+            state.filters.year = allYears.slice(-3);
+          }
+          const allYearsSet = new Set(uniqueYears(state.raw));
+          state.filters.year = state.filters.year.filter(y => allYearsSet.has(y));
+
+          const panelEl = document.getElementById("f_year_panel");
+          if(panelEl){
+            panelEl.innerHTML = opts.length
+              ? opts.map(y => `<label class="ym-item"><input type="checkbox" value="${y}" ${state.filters.year.includes(y) ? "checked" : ""}><span>${y}</span></label>`).join("")
+              : `<div class="muted" style="padding:5px">No years available</div>`;
+            panelEl.querySelectorAll("input[type=checkbox]").forEach(cb => {
+              cb.addEventListener("change", onFilterYearChange);
+            });
+          }
+          const btnEl = document.getElementById("f_year_btn");
+          if(btnEl){
+            const sortedSel = state.filters.year.slice().sort((a,b)=>a-b);
+            btnEl.textContent = sortedSel.length ? "Years: " + sortedSel.join(", ") : "Select Years";
+          }
+        } else {
+          const opts=[...new Set(subset.map(r=>String(r[field]??"").trim()).filter(x=>x!==""))].sort((a,b)=>a.localeCompare(b));
+          let cur = state.filters[field];
+          if(cur!=="All" && !opts.includes(cur)) cur="All";
+          state.filters[field]=cur;
+          renderSimpleFilterPanel(field, opts, cur);
+        }
+      }
+      // sync date + search inputs to state
+      document.getElementById("f_dateFrom").value=state.filters.moveDateFrom||"";
+      document.getElementById("f_dateTo").value=state.filters.moveDateTo||"";
+      document.getElementById("f_search").value=state.filters.search||"";
+    }
+
+    function updateMovementRegionTypeMultiselect(){
+      const movementTypes = [...new Set(state.raw
+        .map(r=>String(r.movementType || "").trim())
+        .filter(Boolean))]
+        .sort((a,b)=>a.localeCompare(b));
+      if(!Array.isArray(state.movementRegionSelectedTypes)) {
+        state.movementRegionSelectedTypes = [...movementTypes];
+      } else {
+        state.movementRegionSelectedTypes = state.movementRegionSelectedTypes.filter(type=>movementTypes.includes(type));
+      }
+
+      const panel = document.getElementById("movementRegionTypePanel");
+      if(!panel) return;
+      panel.innerHTML = movementTypes.length
+        ? movementTypes.map(type=>`<label class="ym-item"><input type="checkbox" value="${escapeHtml(type)}" ${state.movementRegionSelectedTypes.includes(type) ? "checked" : ""}><span>${escapeHtml(type)}</span></label>`).join("")
+        : `<div class="muted" style="padding:5px">No movement types</div>`;
+      panel.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.addEventListener("change", onMovementRegionTypeChange));
+      updateMovementRegionTypeLabel(movementTypes);
+    }
+
+    function updateWaterfallYearSelect(){
+      const select = document.getElementById("waterfallYear");
+      if(!select) return;
+      const years = uniqueYears(state.raw).sort((a,b)=>b-a);
+      if(!years.includes(Number(state.waterfallYear))) state.waterfallYear = years[0] ?? null;
+      select.innerHTML = years.length
+        ? years.map(y=>`<option value="${y}">${y}</option>`).join("")
+        : '<option value="">No years</option>';
+      select.value = state.waterfallYear == null ? "" : String(state.waterfallYear);
+    }
+
+    function updateMovementRegionTypeLabel(movementTypes) {
+      const button = document.getElementById("movementRegionTypeBtn");
+      if(!button) return;
+      const selectedCount = state.movementRegionSelectedTypes.length;
+      button.textContent = movementTypes.length && selectedCount === movementTypes.length
+        ? "Movement Types: All"
+        : `Movement Types: ${selectedCount}`;
+    }
+
+    function onMovementRegionTypeChange(){
+      const panel = document.getElementById("movementRegionTypePanel");
+      state.movementRegionSelectedTypes = [...panel.querySelectorAll("input:checked")].map(cb=>cb.value);
+      const movementTypes = [...new Set(state.raw
+        .map(r=>String(r.movementType || "").trim())
+        .filter(Boolean))];
+      updateMovementRegionTypeLabel(movementTypes);
+      renderMovementCharts();
+    }
+
+    function updateMovementDistTypeMultiselect(){
+      const movementTypes = [...new Set(state.raw
+        .map(r=>String(r.movementType || "").trim())
+        .filter(Boolean))]
+        .sort((a,b)=>a.localeCompare(b));
+      if(!Array.isArray(state.movementDistSelectedTypes)) {
+        state.movementDistSelectedTypes = [...movementTypes];
+      } else {
+        state.movementDistSelectedTypes = state.movementDistSelectedTypes.filter(type=>movementTypes.includes(type));
+      }
+
+      const panel = document.getElementById("movementDistTypePanel");
+      if(!panel) return;
+      panel.innerHTML = movementTypes.length
+        ? movementTypes.map(type=>`<label class="ym-item"><input type="checkbox" value="${escapeHtml(type)}" ${state.movementDistSelectedTypes.includes(type) ? "checked" : ""}><span>${escapeHtml(type)}</span></label>`).join("")
+        : `<div class="muted" style="padding:5px">No movement types</div>`;
+      panel.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.addEventListener("change", onMovementDistTypeChange));
+      updateMovementDistTypeLabel(movementTypes);
+    }
+
+    function updateMovementDistTypeLabel(movementTypes) {
+      const button = document.getElementById("movementDistTypeBtn");
+      if(!button) return;
+      const selectedCount = state.movementDistSelectedTypes.length;
+      button.textContent = movementTypes.length && selectedCount === movementTypes.length
+        ? "Movement Types: All"
+        : `Movement Types: ${selectedCount}`;
+    }
+
+    function onMovementDistTypeChange(){
+      const panel = document.getElementById("movementDistTypePanel");
+      state.movementDistSelectedTypes = [...panel.querySelectorAll("input:checked")].map(cb=>cb.value);
+      const movementTypes = [...new Set(state.raw
+        .map(r=>String(r.movementType || "").trim())
+        .filter(Boolean))];
+      updateMovementDistTypeLabel(movementTypes);
+      renderMovementCharts();
+    }
+
+    function onFilterYearChange(){
+      const panel = document.getElementById("f_year_panel");
+      if(panel){
+        state.filters.year = [...panel.querySelectorAll("input:checked")].map(cb => Number(cb.value));
+      }
+      const btnEl = document.getElementById("f_year_btn");
+      if(btnEl){
+        const sortedSel = state.filters.year.slice().sort((a,b)=>a-b);
+        btnEl.textContent = sortedSel.length ? "Years: " + sortedSel.join(", ") : "Select Years";
+      }
+      refresh(true);
+    }
+
+    // Refresh pipeline
+    function refresh(useState) {
+      if(state._busy) return;
+      state._busy = true;
+      if(!useState) readFiltersFromDOM();
+      updateFilterOptions();
+      updateMovementRegionTypeMultiselect();
+      updateMovementDistTypeMultiselect();
+      updateWaterfallYearSelect();
+      state.filtered=applyFilters(state.raw, state.filters, null);
+      renderAll();
+      state._busy = false;
+    }
+
+    function onFilterChange(){ readFiltersFromDOM(); refresh(true); }
+
+    function clearFilters(){
+      const years=uniqueYears(state.raw).sort((a,b)=>a-b);
+      const defaultYears = years.slice(-3);
+      state.filters = {
+        year: defaultYears, businessView: "All", gcb: "All", dcmHc: resolveDcmDefault(),
+        consolidatedRegion: "All", country: "All", team: "All", movementType: "All",
+        fo: "All", gender: "All", inOut: "All",
+        moveDateFrom:"", moveDateTo:"", search:""
+      };
+      state.movementRegionSelectedTypes=null;
+      state.movementDistSelectedTypes=null;
+      document.getElementById("f_dateFrom").value="";
+      document.getElementById("f_dateTo").value="";
+      document.getElementById("f_search").value="";
+      closeAllSimpleFilterPanels();
+      refresh(true);
+    }
+
+    // Chart helpers
+    function makeChart(id, cfg) {
+      const c=document.getElementById(id);
+      if(!c) return;
+      if(state.charts[id]) { state.charts[id].destroy(); }
+      state.charts[id]=new Chart(c.getContext("2d"), cfg);
+    }
+
+    const baseLinearOpts = () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400, easing: 'easeOutQuart' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: HSBC_CHART_COLORS.black,
+          titleFont: { family: "'Inter', sans-serif", size: 12, weight: "600" },
+          bodyFont: { family: "'Inter', sans-serif", size: 12 },
+          padding: 10,
+          cornerRadius: 8
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            font: { family: "'Inter', sans-serif", size: 10, weight: "500" },
+            color: HSBC_CHART_COLORS.grey7
+          }
+        },
+        y: {
+          grid: { color: HSBC_CHART_COLORS.grid, borderDash: [4, 4], drawBorder: false },
+          ticks: {
+            font: { family: "'Inter', sans-serif", size: 10, weight: "500" },
+            color: HSBC_CHART_COLORS.grey7,
+            precision: 0
+          }
+        }
+      }
+    });
+
+    const dlCount = (color=HSBC_CHART_COLORS.black)=>({
+      display:true, 
+      anchor: "end", 
+      align:"end", 
+      clamp: true, 
+      offset:4, 
+      color,
+      font: { family: "'Inter', sans-serif", weight: "700", size: 10 }, 
+      formatter: v=> v>0? v.toLocaleString(): ""
+    });
+
+    // Draws dashed connector lines from where one waterfall bar ends to where
+    // the next one starts, in the style of a standard bridge/waterfall chart.
+    // Opt-in per chart via options.plugins.waterfallConnectors = { connectors }.
+    const waterfallConnectorPlugin = {
+      id: "waterfallConnectors",
+      afterDatasetsDraw(chart) {
+        const opts = chart.config.options.plugins && chart.config.options.plugins.waterfallConnectors;
+        if(!opts || !opts.connectors || !opts.connectors.length) return;
+        const meta = chart.getDatasetMeta(0);
+        const yScale = chart.scales.y;
+        if(!meta || !meta.data || !yScale) return;
+        const { ctx } = chart;
+        ctx.save();
+        ctx.strokeStyle = opts.color || "rgba(100, 116, 139, 0.55)";
+        ctx.lineWidth = opts.lineWidth || 1.5;
+        ctx.setLineDash(opts.dash || [4, 4]);
+        opts.connectors.forEach(({ from, to, value }) => {
+          const fromEl = meta.data[from];
+          const toEl = meta.data[to];
+          if(!fromEl || !toEl) return;
+          const y = yScale.getPixelForValue(value);
+          const x1 = fromEl.x + fromEl.width / 2;
+          const x2 = toEl.x - toEl.width / 2;
+          if(x2 <= x1) return;
+          ctx.beginPath();
+          ctx.moveTo(x1, y);
+          ctx.lineTo(x2, y);
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
+    };
+
+    // Rendering
+    function renderAll(){
+      renderKPIs();
+      renderCharts();
+      requestAnimationFrame(resizeCharts);
+    }
+
+    function renderCharts(){
+      renderYearBreakdownCharts();
+      renderMovementCharts();
+      renderGcbChart();
+    }
+
+    function renderKPIs() {
+      const f = state.filtered;
+      const employees=uniqueCount(f, ()=>true);
+      const fte=uniqueCount(f, r=> Number(r.fte)===1);
+      const exitsData=applyFilters(state.raw, state.filters, "dcmHc");
+      const exits=uniqueCount(exitsData, r=> /exit|leaver/i.test(r.movementType||""));
+      const promoted = uniqueCount(f, r=> String(r.promoted||"").toLowerCase()==="yes");
+      document.getElementById("kpi_emp").textContent=employees.toLocaleString();
+      document.getElementById("kpi_fte").textContent=fte.toLocaleString();
+      document.getElementById("kpi_exits").textContent=exits.toLocaleString();
+      document.getElementById("kpi_promoted").textContent=promoted.toLocaleString();
+    }
+
+    function renderYearBreakdownCharts(){
+      const f = state.filtered;
+      const yearsSet = [...new Set(f.map(r=>String(r.year||"").trim()).filter(x=>x))].sort();
+
+      const genderSet = [...new Set(f.map(r=>String(r.gender||"").trim()).filter(x=>x))].sort();
+      const cellGender = {};
+      for(const r of f){
+        const y = String(r.year||"").trim(), gen = String(r.gender||"").trim();
+        if(!y || !gen) continue;
+        const k = y + "||" + gen;
+        if(!cellGender[k]) cellGender[k] = new Set();
+        cellGender[k].add(uidOf(r));
+      }
+      const dsGender = genderSet.map(gen=>({
+        label: gen,
+        data: yearsSet.map(y => cellGender[y+"||"+gen]? cellGender[y+"||"+gen].size: 0),
+        backgroundColor: /female|^f$/i.test(gen) ? HSBC_CHART_COLORS.red : /male|^m$/i.test(gen) ? HSBC_CHART_COLORS.richBlack : "#d97706",
+        borderRadius: BAR_RADIUS,
+        datalabels: {display:false}
+      }));
+      const totalsGender = yearsSet.map((y,idx)=>dsGender.reduce((s,ds)=>s+(ds.data[idx]||0),0));
+      if(dsGender.length) {
+        dsGender[dsGender.length-1].datalabels={
+          display:true, anchor: "end", align:"end", clamp: true, offset: 2,
+          color: HSBC_CHART_COLORS.black, font: {weight: "700", size:10, family: "'Inter', sans-serif"},
+          formatter: (v,ctx)=> totalsGender[ctx.dataIndex]||''
+        };
+      }
+      makeChart("c_gender_years", {
+        type: "bar",
+        data: {labels: yearsSet, datasets: dsGender},
+        options: {
+          ...baseLinearOpts(), 
+          layout: {padding:{top:22}},
+          plugins: {
+            legend: { display:true, position:"bottom", labels: { font: { family: "'Inter', sans-serif", size: 11 }, boxWidth: 12, usePointStyle: true } }, 
+            datalabels: { display:false}
+          },
+          scales: {
+            x: { stacked: true, grid: { display: false }, ticks: { font: { family: "'Inter', sans-serif" } } }, 
+            y: { stacked: true, grid: { color: HSBC_CHART_COLORS.grid, borderDash: [4, 4] }, ticks: { precision:0, font: { family: "'Inter', sans-serif" } } }
+          }
+        }
+      });
+
+      const teamSet = [...new Set(f.map(r=>String(r.team||"").trim()).filter(x=>x))].sort();
+      const cellTeam = {};
+      for(const r of f){
+        const y = String(r.year||"").trim(), team = String(r.team||"").trim();
+        if(!y || !team) continue;
+        const k = y + "||" + team;
+        if(!cellTeam[k]) cellTeam[k] = new Set();
+        cellTeam[k].add(uidOf(r));
+      }
+      const dsTeam = teamSet.map(t=>({
+        label: t,
+        data: yearsSet.map(y => cellTeam[y+"||"+t]? cellTeam[y+"||"+t].size: 0),
+        backgroundColor: categoryColor("team", t),
+        borderRadius: BAR_RADIUS,
+        datalabels: {display:false}
+      }));
+      // Horizontal bar chart: years become the category axis (y), employee
+      // counts become the value axis (x), mirroring the Countries chart below.
+      // Height scales with the total number of rendered bars (years x teams),
+      // using the same formula as the Countries chart, so grouped bars get
+      // enough room and don't look congested.
+      const teamYearsChartBox = document.getElementById("c_team_years").parentElement;
+      const teamBarRows = yearsSet.length * (teamSet.length || 1);
+      teamYearsChartBox.style.height = `${Math.max(300, teamBarRows * 30 + 52)}px`;
+      makeChart("c_team_years", {
+        type: "bar",
+        data: {labels: yearsSet, datasets: dsTeam},
+        options: {
+          ...baseLinearOpts(),
+          indexAxis: "y",
+          layout: {padding:{right:32}},
+          plugins: {
+            legend: { display:true, position:"bottom", labels: { font: { family: "'Inter', sans-serif", size: 11 }, boxWidth: 12, usePointStyle: true } }, 
+            datalabels: { display:false}
+          },
+          scales: {
+            y: { stacked: false, grid: { display: false }, ticks: { font: { family: "'Inter', sans-serif" } } }, 
+            x: { stacked: false, grid: { color: HSBC_CHART_COLORS.grid, borderDash: [4, 4] }, ticks: { precision:0, font: { family: "'Inter', sans-serif" } } }
+          }
+        }
+      });
+    }
+
+    function renderMovementCharts(){
+      const f = state.filtered;
+      // This chart has its own multi-select Movement Type control (mirroring
+      // Movement Type by Consolidated Region), so it ignores the sidebar's
+      // single-select Movement Type filter while retaining every other filter.
+      const movementDistRecords = applyFilters(state.raw, state.filters, "movementType");
+      const selectedDistTypes = new Set(state.movementDistSelectedTypes || []);
+      const movementDistFilteredRecords = movementDistRecords.filter(r=>
+        selectedDistTypes.has(String(r.movementType || "").trim())
+      );
+      const mt=groupCountRows(movementDistFilteredRecords, "movementType").sort((a,b)=>b[1]-a[1]);
+      makeChart("c_movement", {
+        type: "bar",
+        data:{
+          labels:mt.map(x=>x[0]), 
+          datasets: [{
+            data:mt.map(x=>x[1]),
+            backgroundColor:mt.map(x=>categoryColor("movementType", x[0])), 
+            borderRadius:BAR_RADIUS
+          }]
+        },
+        options: {
+          ...baseLinearOpts(), 
+          layout: {padding: { top:20}},
+          plugins: {legend: { display:false}, datalabels: dlCount()},
+          scales: {
+            y: { grid: { color: HSBC_CHART_COLORS.grid, borderDash: [4, 4] }, ticks: {precision:0, font: { family: "'Inter', sans-serif" }} },
+            x: { grid: { display: false }, ticks: { autoSkip: false, maxRotation: 30, minRotation:15, font: {size:9, family: "'Inter', sans-serif"}}}
+          }
+        }
+      });
+
+      // Uses the full dataset and its own year selector, deliberately independent of sidebar filters.
+      const waterfallRecords = state.waterfallYear == null
+        ? []
+        : state.raw.filter(r=>Number(r.year)===Number(state.waterfallYear));
+      const waterfallMovements = groupCountRows(waterfallRecords, "movementType").sort((a,b)=>{
+        const aIsStart = /^start\s+of\s+the\s+year$/i.test(a[0]);
+        const bIsStart = /^start\s+of\s+the\s+year$/i.test(b[0]);
+        if(aIsStart && !bIsStart) return -1;
+        if(!aIsStart && bIsStart) return 1;
+        return a[0].localeCompare(b[0]);
+      });
+      let runningTotal = 0;
+      const waterfallSteps = waterfallMovements.map(([label, count])=>{
+        const isOutflow = /exit|leaver|(?:^|\s)out\b/i.test(label);
+        const change = isOutflow ? -count : count;
+        const start = runningTotal;
+        runningTotal += change;
+        return { label, change, start, end: runningTotal };
+      });
+      const waterfallLabels = waterfallSteps.length
+        ? [...waterfallSteps.map(step=>step.label), "Net movement"]
+        : ["No movement data"];
+      const waterfallData = waterfallSteps.length
+        ? [...waterfallSteps.map(step=>[Math.min(step.start, step.end), Math.max(step.start, step.end)]), [Math.min(0, runningTotal), Math.max(0, runningTotal)]]
+        : [[0, 0]];
+      const waterfallChanges = waterfallSteps.length
+        ? [...waterfallSteps.map(step=>step.change), runningTotal]
+        : [0];
+      // One connector per step, linking the cumulative level it ends on (bar i)
+      // to the following bar (bar i+1) — the last connector lands on the
+      // Net movement bar, since that bar's top is also the final running total.
+      const waterfallConnectors = waterfallSteps.map((step, i) => ({
+        from: i,
+        to: i + 1,
+        value: step.end
+      }));
+      makeChart("c_movement_waterfall", {
+        type: "bar",
+        data: {
+          labels: waterfallLabels,
+          datasets: [{
+            data: waterfallData,
+            backgroundColor: waterfallChanges.map((change, i)=> i===waterfallChanges.length-1 ? "#334155" : change < 0 ? "#db0011" : "#14161d"),
+            borderRadius: BAR_RADIUS
+          }]
+        },
+        options: {
+          ...baseLinearOpts(),
+          layout: { padding: { top: 20 } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: HSBC_CHART_COLORS.black,
+              padding: 10,
+              cornerRadius: 8,
+              callbacks: { label: ctx=>`${ctx.dataIndex===waterfallChanges.length-1 ? "Net movement" : "Change"}: ${waterfallChanges[ctx.dataIndex] > 0 ? "+" : ""}${waterfallChanges[ctx.dataIndex].toLocaleString()}` }
+            },
+            datalabels: {
+              display: ctx=>waterfallChanges[ctx.dataIndex] !== 0,
+              anchor: "end",
+              align: "end",
+              color: HSBC_CHART_COLORS.black,
+              font: { family: "'Inter', sans-serif", weight: "700", size: 10 },
+              formatter: (_value, ctx)=>`${waterfallChanges[ctx.dataIndex] > 0 ? "+" : ""}${waterfallChanges[ctx.dataIndex].toLocaleString()}`
+            },
+            waterfallConnectors: {
+              connectors: waterfallConnectors,
+              color: "rgba(100, 116, 139, 0.55)",
+              dash: [4, 3],
+              lineWidth: 1.5
+            }
+          },
+          scales: {
+            y: { grid: { color: HSBC_CHART_COLORS.grid, borderDash: [4, 4] }, ticks: { precision: 0, font: { family: "'Inter', sans-serif" } } },
+            x: { grid: { display: false }, ticks: { autoSkip: false, maxRotation: 30, minRotation: 15, font: { size: 9, family: "'Inter', sans-serif" } } }
+          }
+        }
+      });
+
+      // This chart has its own multi-select Movement Type control, mirroring the
+      // former chart-level Year selector. It therefore ignores the sidebar's
+      // single-select Movement Type filter while retaining every other filter.
+      const movementRegionRecords = applyFilters(state.raw, state.filters, "movementType");
+      const selectedMovementTypes = new Set(state.movementRegionSelectedTypes || []);
+      const movementRegionFilteredRecords = movementRegionRecords.filter(r=>
+        selectedMovementTypes.has(String(r.movementType || "").trim())
+      );
+      const regions = [...new Set(movementRegionFilteredRecords.map(r=>String(r.consolidatedRegion||"").trim()).filter(Boolean))].sort();
+      const movementTypes = [...new Set(movementRegionFilteredRecords.map(r=>String(r.movementType||"").trim()).filter(Boolean))]
+        .sort((a,b)=>{
+          const aIsStart = /^start\s+of\s+the\s+year$/i.test(a);
+          const bIsStart = /^start\s+of\s+the\s+year$/i.test(b);
+          if(aIsStart && !bIsStart) return -1;
+          if(!aIsStart && bIsStart) return 1;
+          return a.localeCompare(b);
+        });
+      const movementRegionDatasets = movementTypes.map(movementType=>({
+        label: movementType,
+        data: regions.map(region=>movementRegionFilteredRecords.filter(r=>String(r.consolidatedRegion||"").trim()===region && String(r.movementType||"").trim()===movementType).length),
+        backgroundColor: categoryColor("movementType", movementType),
+        borderRadius: BAR_RADIUS,
+        datalabels: { display: false }
+      }));
+      const movementRegionTotals = regions.map((_, index)=>movementRegionDatasets.reduce((total, dataset)=>total + (dataset.data[index] || 0), 0));
+      const movementRegionLastDatasets = regions.map((_, index)=>{
+        for(let datasetIndex = movementRegionDatasets.length - 1; datasetIndex >= 0; datasetIndex--) {
+          if(movementRegionDatasets[datasetIndex].data[index] > 0) return datasetIndex;
+        }
+        return -1;
+      });
+      movementRegionDatasets.forEach((dataset, datasetIndex)=>{
+        dataset.datalabels = {
+          display: ctx=>datasetIndex === movementRegionLastDatasets[ctx.dataIndex],
+          anchor: "end",
+          align: "end",
+          clamp: true,
+          offset: 2,
+          color: HSBC_CHART_COLORS.black,
+          font: { weight: "700", size: 10, family: "'Inter', sans-serif" },
+          formatter: (_value, ctx)=>movementRegionTotals[ctx.dataIndex].toLocaleString()
+        };
+      });
+      makeChart("c_movement_region", {
+        type: "bar",
+        data: {
+          labels: regions,
+          datasets: movementRegionDatasets
+        },
+        options: {
+          ...baseLinearOpts(),
+          layout: { padding: { top: 22 } },
+          plugins: {
+            legend: {
+              display: true,
+              position: "bottom",
+              labels: { boxWidth: 10, padding: 12, font: { family: "'Inter', sans-serif", size: 10 }, color: HSBC_CHART_COLORS.grey8 }
+            },
+            datalabels: { display: false }
+          },
+          scales: {
+            x: { stacked: true, grid: { display: false }, ticks: { autoSkip: false, maxRotation: 30, minRotation: 15, font: { size: 9, family: "'Inter', sans-serif" } } },
+            y: { stacked: true, grid: { color: HSBC_CHART_COLORS.grid, borderDash: [4, 4] }, ticks: { precision: 0, font: { family: "'Inter', sans-serif" } } }
+          }
+        }
+      });
+
+      // Year-wise employee count, stacked by consolidated region. This now uses
+      // the shared sidebar Year filter rather than a chart-specific selector.
+      const yearwiseYears = [...new Set(f.map(r=>String(r.year || "").trim()).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));
+      const yearwiseRegions = [...new Set(f.map(r=>String(r.consolidatedRegion || "").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+      const yearwiseCells = {};
+      for(const r of f) {
+        const year = String(r.year || "").trim();
+        const region = String(r.consolidatedRegion || "").trim();
+        if(!year || !region) continue;
+        const key = `${year}||${region}`;
+        if(!yearwiseCells[key]) yearwiseCells[key] = new Set();
+        yearwiseCells[key].add(uidOf(r));
+      }
+      const yearwiseDatasets = yearwiseRegions.map(region=>({
+        label: region,
+        data: yearwiseYears.map(year=>yearwiseCells[`${year}||${region}`]?.size || 0),
+        backgroundColor: categoryColor("consolidatedRegion", region),
+        borderRadius: BAR_RADIUS,
+        datalabels: { display: false }
+      }));
+      const yearwiseTotals = yearwiseYears.map((_, index)=>yearwiseDatasets.reduce((total, dataset)=>total + (dataset.data[index] || 0), 0));
+      const yearwiseLastDatasets = yearwiseYears.map((_, index)=>{
+        for(let datasetIndex = yearwiseDatasets.length - 1; datasetIndex >= 0; datasetIndex--) {
+          if(yearwiseDatasets[datasetIndex].data[index] > 0) return datasetIndex;
+        }
+        return -1;
+      });
+      yearwiseDatasets.forEach((dataset, datasetIndex)=>{
+        dataset.datalabels = {
+          display: ctx=>datasetIndex === yearwiseLastDatasets[ctx.dataIndex],
+          anchor: "end",
+          align: "end",
+          clamp: true,
+          offset: 2,
+          color: HSBC_CHART_COLORS.black,
+          font: { weight: "700", size: 10, family: "'Inter', sans-serif" },
+          formatter: (_value, ctx)=>yearwiseTotals[ctx.dataIndex].toLocaleString()
+        };
+      });
+      makeChart("c_yearwise", {
+        type: "bar",
+        data:{
+          labels: yearwiseYears,
+          datasets: yearwiseDatasets
+        },
+        options: {
+          ...baseLinearOpts(),
+          layout: { padding: {top:22}},
+          plugins: {
+            legend: {
+              display:true,
+              position:"bottom",
+              labels: { boxWidth: 10, padding: 12, font: { family: "'Inter', sans-serif", size: 10 }, color: HSBC_CHART_COLORS.grey8 }
+            },
+            datalabels: { display:false }
+          },
+          scales: {
+            x: { stacked:true, grid: { display: false }, ticks: { font: { family: "'Inter', sans-serif" } } },
+            y: { stacked:true, grid: { color: HSBC_CHART_COLORS.grid, borderDash: [4, 4] }, ticks: {precision:0, font: { family: "'Inter', sans-serif" }} }
+          }
+        }
+      });
+
+      const ctry=groupCountRows(f, "country").sort((a,b)=>b[1]-a[1]);
+      const countryChartBox = document.getElementById("c_country").parentElement;
+      countryChartBox.style.height = `${Math.max(300, ctry.length * 30 + 52)}px`;
+      makeChart("c_country", {
+        type: "bar",
+        data:{
+          labels:ctry.map(x=>x[0]), 
+          datasets:[{data:ctry.map(x=>x[1]), backgroundColor: "#db0011", borderRadius:BAR_RADIUS}]
+        },
+        options: {
+          ...baseLinearOpts(), 
+          indexAxis: "y",
+          layout: { padding:{right:32}},
+          plugins: {legend: {display:false}, datalabels: dlCount()},
+          scales: {
+            y: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 10, family: "'Inter', sans-serif" } } },
+            x: { grid: { color: HSBC_CHART_COLORS.grid, borderDash: [4, 4] }, ticks: { precision: 0, font: { family: "'Inter', sans-serif" } } }
+          }
+        }
+      });
+    }
+
+    function renderGcbChart(){
+      const f=state.filtered;
+      const gcbs=[...new Set(f.map(r=>String(r.gcb||"").trim()).filter(x=>x))].sort();
+      const regions=[...new Set(f.map(r=>String(r.consolidatedRegion||"").trim()).filter(x=>x))].sort();
+      const cell={};
+      for(const r of f){
+        const g=String(r.gcb||"").trim(), reg=String(r.consolidatedRegion||"").trim();
+        if(!g || !reg) continue;
+        const k=g+"||"+reg;
+        if(!cell[k]) cell[k] = new Set();
+        cell[k].add(uidOf(r));
+      }
+      const datasets=regions.map(reg=>({
+        label:reg,
+        data:gcbs.map(g=> cell[g+"||"+reg]? cell[g+"||"+reg].size: 0),
+        backgroundColor: categoryColor("consolidatedRegion", reg),
+        borderRadius: BAR_RADIUS,
+        datalabels: {display:false}
+      }));
+      const totals=gcbs.map((g,idx)=>datasets.reduce((s,ds)=>s+(ds.data[idx]||0),0));
+      if(datasets.length) {
+        datasets[datasets.length-1].datalabels={
+          display:true, anchor: "end", align:"end", clamp: true, offset: 2,
+          color: HSBC_CHART_COLORS.black, font: {weight: "700", size:10, family: "'Inter', sans-serif"},
+          formatter: (v,ctx)=> totals[ctx.dataIndex]||''
+        };
+      }
+      makeChart("c_gcb", {
+        type: "bar",
+        data: {labels:gcbs, datasets},
+        options: {
+          ...baseLinearOpts(), 
+          layout: {padding:{top:22}},
+          plugins: {
+            legend: {
+              display:true,
+              position:"bottom",
+              labels: { font: { family: "'Inter', sans-serif", size: 11 }, boxWidth: 12, usePointStyle: true }
+            }, 
+            datalabels: { display:false}
+          },
+          scales: {
+            x: { 
+              stacked: true, 
+              grid: { display: false },
+              ticks: { font: { family: "'Inter', sans-serif" } }
+            }, 
+            y: { 
+              stacked: true, 
+              grid: { color: HSBC_CHART_COLORS.grid, borderDash: [4, 4] },
+              ticks: { precision:0, font: { family: "'Inter', sans-serif" } }
+            }
+          }
+        }
+      });
+    }
+
+    function resizeCharts() { Object.values (state.charts).forEach(c=>{ try{ c.resize(); }catch(e){} }); }
+
+    // IndexedDB (file handle persistence)
+    function idbOpen() {
+      return new Promise((res, rej)=>{
+        const req=indexedDB.open("hc-dashboard", 1);
+        req.onupgradeneeded=()=>{ req.result.createObjectStore("handles"); };
+        req.onsuccess=()=>res (req.result);
+        req.onerror=()=>rej (req.error);
+      });
+    }
+    async function idbSet(key, val) { const db=await idbOpen(); return new Promise((res, rej)=>{ const tx=db.transaction("handles", "readwrite"); tx.objectStore("handles").put(val, key); tx.oncomplete=()=>res(); tx.onerror=()=>rej (tx.error); }); }
+    async function idbGet(key) { const db=await idbOpen(); return new Promise((res, rej)=> { const tx=db.transaction("handles", "readonly"); const r = tx.objectStore("handles").get(key); r.onsuccess=()=>res(r.result); r.onerror=()=>rej (r.error); }); }
+
+    // File System Access API
+    async function verifyPermission(handle, withWrite=false){
+      const opts={mode: withWrite? "readwrite": "read"};
+      if(await handle.queryPermission(opts)==="granted") return true;
+      if(await handle.requestPermission(opts)==="granted") return true;
+      return false;
+    }
+
+    async function parseFile(file) {
+      try{
+        const buf = await file.arrayBuffer();
+        const wb=XLSX.read(buf, {type: "array", cellDates:true});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(sheet, {defval:null,raw:true});
+        const norm = normalizeRows(rows);
+        if(!norm.length) { setStatus(`Loaded ${file.name} but no usable rows were found. `); return; }
+        loadData(norm, file.name, false);
+      }catch(e){
+        setStatus("Failed to parse file: "+(e && e.message ? e.message : e));
+      }
+    }
+
+    async function loadFromHandle(handle){
+      try{
+        const file=await handle.getFile();
+        await parseFile(file);
+      } catch(e){
+        setStatus("Could not read stored file: "+(e && e.message ? e.message: e));
+      }
+    }
+
+    async function selectFile(){
+      if("showOpenFilePicker" in window) {
+        try{
+          const [handle]=await window.showOpenFilePicker({
+            multiple:false,
+            types: [{description: "Excel Files", accept: {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+              "application/vnd.ms-excel":[".xls"]
+            }}]
+          });
+          state.lastFileHandle=handle;
+          await idbSet("lastExcelHandle", handle);
+          document.getElementById("btnRefresh").style.display="";
+          await loadFromHandle (handle);
+        } catch(e){
+          if(e && e.name==="AbortError") return;
+          setStatus("File selection failed: "+(e && e.message? e.message: e));
+        }
+      } else {
+        document.getElementById("fileInput").click();
+      }
+    }
+
+    async function refreshFile(){
+      if(!state.lastFileHandle) { setStatus ("No stored file to refresh select a file first."); return; }
+      const ok = await verifyPermission(state.lastFileHandle, false);
+      if(!ok) { setStatus("Permission denied for the stored file."); return; }
+      setStatus("Refreshing...");
+      await loadFromHandle(state.lastFileHandle);
+    }
+
+    async function tryRestoreHandle(){
+      if(!("showOpenFilePicker" in window)) return;
+      try{
+        const handle=await idbGet("lastExcelHandle");
+        if(handle) {
+          state.lastFileHandle = handle;
+          document.getElementById("btnRefresh").style.display="";
+          const perm = await handle.queryPermission({mode: "read"});
+          if(perm==="granted") { await loadFromHandle(handle); }
+          else { setStatus(`Previous file "${handle.name}" found. Click Refresh to reload it.`); }
+        }
+      }catch(e){ /* ignore */ }
+    }
+
+    // Load data into dashboard
+    function loadData(records, name, isSample){
+      state.raw = records;
+      state.categoryColorOrders = {};
+      clearFilters();
+      if(isSample) setStatus("Please select an Excel file to begin. (Showing sample data)");
+      else setStatus(`Loaded: ${name} (${state.raw.length.toLocaleString()} rows)`);
+    }
+
+    // Sample data
+    let _seed=987654321;
+    function rnd(){ _seed=(_seed*1103515245+12345)%0x7fffffff; return _seed/0x7fffffff; }
+    function pick(a){ return a [Math.floor(rnd()*a.length)]; }
+    function randint(a, b) { return a+Math.floor(rnd()*(b-a+1)); }
+
+    function buildSampleData() {
+      const businessViews = ["DCM Origination", "DCM Syndicate", "Leveraged Finance", "Sustainable Finance"];
+      const teams=["Bond Syndicate", "Corporate DCM", "FIG DCM", "SSA DCM", "Leveraged Finance", "ESG Finance", "Securitisation", "Private Placements"];
+      const subTeams = ["Primary", "Execution", "Structuring", "Coverage", "Trading Support"];
+      const regionCountries={
+        "Europe" : ["United Kingdom", "France", "Germany", "Switzerland"],
+        "Americas": ["United States", "Canada", "Brazil"],
+        "Asia Pacific": ["Hong Kong", "Singapore", "Japan", "India", "Australia"],
+        "MENA": ["United Arab Emirates", "Saudi Arabia"]
+      };
+      const regions=Object.keys(regionCountries);
+      const gcbs=["GCB2", "GCB3", "GCB4", "GCB5", "GCB6", "GCB7"];
+      const genders = ["Male", "Female"];
+      const fos = ["FO", "Non-FO"];
+      const movements=["New Hire", "Internal Transfer In", "Internal Transfer Out", "Exit", "Leaver", "Promotion", "Rehire"];
+      const years=[2022, 2023, 2024, 2025, 2026];
+      const roles = ["Analyst", "Associate", "Vice President", "Director", "Managing Director"];
+      const first = ["James", "Priya", "Wei", "Sofia", "Omar", "Emma", "Liam", "Aisha", "Noah", "Yuki", "Carlos", "Chloe", "Raj", "Hannah", "Diego", "Mei", "Tom", "Sara", "Ivan", "Lena", "Grace", "Hugo", "Nadia", "Felix"];
+      const last=["Smith", "Patel", "Chen", "Garcia", "Khan", "Muller", "Brown", "Ali", "Wong", "Tanaka", "Silva", "Dubois", "Sharma", "Nguyen", "Rossi", "Kim", "Jones", "Haddad", "Novak", "Andersson", "Okafor", "Larsen", "Costa", "Reyes"];
+      const rows=[];
+
+      for(let i=0;i<110;i++){
+        const bv=pick(businessViews);
+        const region=pick(regions);
+        const country=pick(regionCountries [region]);
+        const team = pick(teams);
+        const mvt=pick(movements);
+        const year = pick(years);
+        const isOut=/out|exit|leaver/i.test(mvt);
+        const fn=pick(first), ln = pick(last);
+        const promoted = (mvt==="Promotion") ? "Yes": (rnd()<0.12? "Yes": "No");
+        const dd=String (randint(1, 28)).padStart (2, "0");
+        const hasDate = rnd()>0.08;
+        const mm=String(randint(1, 12)).padStart(2, "0");
+
+        rows.push({
+          businessView:bv,
+          year: year,
+          employeeId: "HC"+(10000+i),
+          employeeName: `${fn} ${ln}`,
+          employeeEmail: `${fn.toLowerCase()}.${ln.toLowerCase()}@hsbc.com`,
+          gcb: pick (gcbs),
+          fte: rnd()<0.85? 1 : 0.5,
+          dcmHc: rnd()<0.82? "Yes": "No",
+          consolidatedRegion:region,
+          country: country,
+          gender:pick(genders),
+          fo:pick(fos),
+          role:pick(roles),
+          team:team,
+          subTeam: pick (subTeams),
+          inOut: isOut? "Out": "In",
+          movementType:mvt,
+          moveDate: hasDate ? `${year}-${mm}-${dd}` : "",
+          promoted: promoted
+        });
+      }
+      return rows;
+    }
+
+    const sampleData = buildSampleData();
+
+    // Wiring
+    function wireEvents(){
+      document.getElementById("f_dateFrom").addEventListener("change", onFilterChange);
+      document.getElementById("f_dateTo").addEventListener("change", onFilterChange);
+      document.getElementById("f_search").addEventListener("input", onFilterChange);
+      document.getElementById("btnSelect").addEventListener("click", selectFile);
+      document.getElementById("btnRefresh").addEventListener("click", refreshFile);
+      document.getElementById("btnReset").addEventListener("click", clearFilters);
+      document.getElementById("btnClear").addEventListener("click", clearFilters);
+      document.getElementById("fileInput").addEventListener("change", e=>{
+        const file=e.target.files && e.target.files[0];
+        if(file) parseFile(file);
+      });
+      const movementRegionTypeBtn=document.getElementById("movementRegionTypeBtn");
+      const movementRegionTypePanel=document.getElementById("movementRegionTypePanel");
+      if(movementRegionTypeBtn && movementRegionTypePanel) {
+        movementRegionTypeBtn.addEventListener("click", e=>{
+          e.stopPropagation();
+          const isOpen = movementRegionTypePanel.classList.toggle("open");
+          movementRegionTypeBtn.setAttribute("aria-expanded", String(isOpen));
+        });
+        document.addEventListener("click", e=>{
+          if(!movementRegionTypePanel.contains(e.target) && e.target!==movementRegionTypeBtn) {
+            movementRegionTypePanel.classList.remove("open");
+            movementRegionTypeBtn.setAttribute("aria-expanded", "false");
+          }
+        });
+      }
+
+      const movementDistTypeBtn=document.getElementById("movementDistTypeBtn");
+      const movementDistTypePanel=document.getElementById("movementDistTypePanel");
+      if(movementDistTypeBtn && movementDistTypePanel) {
+        movementDistTypeBtn.addEventListener("click", e=>{
+          e.stopPropagation();
+          const isOpen = movementDistTypePanel.classList.toggle("open");
+          movementDistTypeBtn.setAttribute("aria-expanded", String(isOpen));
+        });
+        document.addEventListener("click", e=>{
+          if(!movementDistTypePanel.contains(e.target) && e.target!==movementDistTypeBtn) {
+            movementDistTypePanel.classList.remove("open");
+            movementDistTypeBtn.setAttribute("aria-expanded", "false");
+          }
+        });
+      }
+
+      document.getElementById("waterfallYear").addEventListener("change", e=>{
+        state.waterfallYear = Number(e.target.value);
+        renderMovementCharts();
+      });
+
+      const fYearBtn=document.getElementById("f_year_btn"), fYearPanel=document.getElementById("f_year_panel");
+      if(fYearBtn && fYearPanel) {
+        fYearBtn.addEventListener("click", e=>{
+          e.stopPropagation();
+          const isOpen = fYearPanel.classList.toggle("open");
+          fYearBtn.setAttribute("aria-expanded", String(isOpen));
+          if(isOpen) closeAllSimpleFilterPanels();
+        });
+        document.addEventListener("click", e=>{
+          if(!fYearPanel.contains(e.target) && e.target!==fYearBtn) {
+            fYearPanel.classList.remove("open");
+            fYearBtn.setAttribute("aria-expanded", "false");
+          }
+        });
+      }
+
+      // Single-select sidebar filter dropdowns (Business View, GCB, DCM HC?,
+      // Consolidated Region, Country, Team, Movement Type, FO/Non-FO, Gender,
+      // In/Out) all share the Year filter's button + panel interaction model.
+      SIMPLE_FILTER_FIELDS.forEach(field=>{
+        const btn=document.getElementById("f_"+field+"_btn");
+        const panel=document.getElementById("f_"+field+"_panel");
+        if(!btn || !panel) return;
+        btn.addEventListener("click", e=>{
+          e.stopPropagation();
+          const willOpen = !panel.classList.contains("open");
+          closeAllSimpleFilterPanels();
+          if(fYearPanel){ fYearPanel.classList.remove("open"); }
+          if(fYearBtn){ fYearBtn.setAttribute("aria-expanded", "false"); }
+          if(willOpen){
+            panel.classList.add("open");
+            btn.setAttribute("aria-expanded", "true");
+          }
+        });
+      });
+      document.addEventListener("click", e=>{
+        SIMPLE_FILTER_FIELDS.forEach(field=>{
+          const panel=document.getElementById("f_"+field+"_panel");
+          const btn=document.getElementById("f_"+field+"_btn");
+          if(panel && btn && !panel.contains(e.target) && e.target!==btn){
+            panel.classList.remove("open");
+            btn.setAttribute("aria-expanded", "false");
+          }
+        });
+      });
+
+      window.addEventListener("resize", ()=>requestAnimationFrame(resizeCharts));
+    }
+
+    async function init(){
+      Chart.register(ChartDataLabels);
+      Chart.register(waterfallConnectorPlugin);
+      Chart.defaults.plugins.datalabels = {display:false}; // off by default; enabled per chart
+      Chart.defaults.font.family = "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      Chart.defaults.color = HSBC_CHART_COLORS.grey7;
+      wireEvents();
+
+      if(!("showOpenFilePicker" in window)){
+        setStatus("Auto-reload needs Chrome or Edge. You can still select a file manually. (Showing sample data)");
+      }
+      // demo with sample data first
+      loadData (sampleData, "(sample data)", true);
+      // then attempt to restore a previously selected file
+      await tryRestoreHandle();
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+</html>

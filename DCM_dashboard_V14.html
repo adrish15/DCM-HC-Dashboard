@@ -1334,6 +1334,36 @@
     body.print-mode .axis-scale-row { display: none !important; }
     body.print-mode .c-title { padding-right: 0; }
 
+    /* Values that would not fit inside their stacked segment, listed under the
+       chart at print time only (see renderPrintValueNotes). Built solely during
+       the print pass, so it is display:none everywhere else as a belt-and-
+       braces guard against it ever showing on screen. */
+    .chart-values-note { display: none; }
+    body.print-mode .chart-values-note {
+      display: block;
+      margin-top: 7px;
+      padding-top: 6px;
+      border-top: 1px dashed var(--slate-300);
+      font-size: 8px;
+      line-height: 1.6;
+      color: var(--slate-600);
+    }
+    body.print-mode .chart-values-note .cv-lead {
+      font-weight: 700;
+      color: var(--slate-500);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    body.print-mode .chart-values-note .cv-group { white-space: nowrap; }
+    body.print-mode .chart-values-note .cv-sep { margin: 0 5px; color: var(--slate-400); }
+    body.print-mode .chart-values-note .cv-chip {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin-right: 2px;
+      border-radius: 1px;
+    }
+
     /* Two columns, and nothing that straddles a page boundary.
        No `align-items: start` here on purpose: the default `stretch` is what
        gives the two cards in a row a shared height. Cards differ in natural
@@ -2924,7 +2954,11 @@
       anchor: 'center',
       align: 'center',
       font: { weight: '700', size: fontSize, family: "'Inter', sans-serif" },
-      formatter: v => v > 0 ? v.toLocaleString() : ''
+      formatter: v => v > 0 ? v.toLocaleString() : '',
+      // Marks a dataset as carrying in-segment value labels that can be
+      // suppressed for want of room, so the print pass knows which datasets to
+      // re-check and list underneath (see suppressedSegments).
+      _stackedSegment: true
     });
 
     // ─── Single-category doughnut fallback ───
@@ -4613,6 +4647,77 @@
     // layout on screen; each chart is then resized and redrawn synchronously
     // so the canvas the printer receives was drawn at the printed column
     // width, not stretched from the last on-screen render.
+    // ─── Print: values that would not fit inside their segment ───
+    // A stacked segment too small to hold its number is left blank (see
+    // stackedLabelFits), and print makes the bars narrower still. Leader lines
+    // out to the side are not an option: in the two-column print grid the
+    // densest chart gets roughly 16px per bar, while a callout needs about 40px
+    // of clear space, so the leaders would cross neighbouring bars. The dropped
+    // values are therefore listed once beneath the chart, grouped by category
+    // and colour-keyed to their series. Charts where everything fitted get no
+    // note at all.
+    function suppressedSegments(chart){
+      if(!chart || !chart.config || chart.config.type !== "bar") return [];
+      const out = [];
+      chart.data.datasets.forEach((ds, datasetIndex) => {
+        const dl = ds.datalabels;
+        if(!dl || !dl._stackedSegment) return;
+        const meta = chart.getDatasetMeta(datasetIndex);
+        if(meta && meta.hidden) return;
+        const fontSize = (dl.font && dl.font.size) || 11;
+        ds.data.forEach((value, dataIndex) => {
+          if(!(value > 0)) return;
+          if(stackedLabelFits({ chart, dataset: ds, datasetIndex, dataIndex }, fontSize)) return;
+          out.push({
+            categoryIndex: dataIndex,
+            datasetIndex,
+            category: String(chart.data.labels[dataIndex] ?? ""),
+            series: String(ds.label ?? ""),
+            value,
+            color: typeof ds.backgroundColor === "string" ? ds.backgroundColor : HSBC_CHART_COLORS.grey6
+          });
+        });
+      });
+      // Left to right along the x-axis, then bottom to top within a stack, so
+      // the list reads in the same order as the chart above it.
+      out.sort((a,b)=> a.categoryIndex - b.categoryIndex || a.datasetIndex - b.datasetIndex);
+      return out;
+    }
+
+    function renderPrintValueNotes(){
+      Object.keys(state.charts || {}).forEach(id => {
+        const canvas = document.getElementById(id);
+        const card = canvas && canvas.closest(".chart-card");
+        if(!card) return;
+        let note = card.querySelector(".chart-values-note");
+        let missing = [];
+        // A chart that failed to build must not block the whole print.
+        try { missing = suppressedSegments(state.charts[id]); } catch(e) { missing = []; }
+        if(!missing.length){ if(note) note.remove(); return; }
+        if(!note){
+          note = document.createElement("div");
+          note.className = "chart-values-note";
+          card.appendChild(note);
+        }
+        const byCategory = new Map();
+        for(const m of missing){
+          if(!byCategory.has(m.category)) byCategory.set(m.category, []);
+          byCategory.get(m.category).push(m);
+        }
+        const groups = [...byCategory.entries()].map(([category, items]) =>
+          `<span class="cv-group"><b>${escapeHtml(category)}</b> ` +
+          items.map(i =>
+            `<span class="cv-chip" style="background:${escapeHtml(i.color)}"></span>${escapeHtml(i.series)}&nbsp;${i.value.toLocaleString()}`
+          ).join(", ") + `</span>`
+        ).join('<span class="cv-sep">·</span>');
+        note.innerHTML = `<span class="cv-lead">Too small to label:</span> ${groups}`;
+      });
+    }
+
+    function clearPrintValueNotes(){
+      document.querySelectorAll(".chart-values-note").forEach(el => el.remove());
+    }
+
     function setPrintMode(on) {
       document.body.classList.toggle("print-mode", on);
       Object.values(state.charts || {}).forEach(ch => {
@@ -4620,6 +4725,8 @@
         // One chart that failed to build must not block the whole print.
         try { ch.resize(); ch.update("none"); } catch(e) {}
       });
+      // Read after the resize above, so the fit test sees print geometry.
+      if(on) renderPrintValueNotes(); else clearPrintValueNotes();
     }
 
     // The Print button collapses the filters sidebar first so the charts are
@@ -4651,7 +4758,12 @@
         // the browser snapshots the page for the print preview.
         // The sidebar and print-mode are put back by the afterprint handler,
         // which fires whether the print dialog is confirmed or cancelled.
-        requestAnimationFrame(()=>requestAnimationFrame(()=>window.print()));
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{
+          // Recompute against the settled layout: the collapsed sidebar widens
+          // every chart, which lets some labels fit that did not a frame ago.
+          renderPrintValueNotes();
+          window.print();
+        }));
       });
     }
 

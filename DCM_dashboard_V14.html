@@ -1135,6 +1135,20 @@
       margin: -8px 0 14px;
     }
     .chart-subtitle:empty { display: none; }
+
+    /* Year key sitting beside a chart title rather than on a row of its own.
+       .c-title is a flex row with space-between, so margin-right:auto is what
+       makes the badges hug the title text and leaves the action buttons on the
+       right; without it they would drift to the middle. */
+    .c-title-badges {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-right: auto;
+    }
+    .c-title-badges:empty { display: none; }
+    .c-title-badges .year-badge { font-size: 11px; padding: 1px 8px; }
     .chart-subtitle-bottom { margin: 14px 0 0; justify-content: center; }
 
     /* Manual y-axis scaler under the Movement Type Waterfall chart */
@@ -1334,36 +1348,6 @@
     body.print-mode .axis-scale-row { display: none !important; }
     body.print-mode .c-title { padding-right: 0; }
 
-    /* Values that would not fit inside their stacked segment, listed under the
-       chart at print time only (see renderPrintValueNotes). Built solely during
-       the print pass, so it is display:none everywhere else as a belt-and-
-       braces guard against it ever showing on screen. */
-    .chart-values-note { display: none; }
-    body.print-mode .chart-values-note {
-      display: block;
-      margin-top: 7px;
-      padding-top: 6px;
-      border-top: 1px dashed var(--slate-300);
-      font-size: 8px;
-      line-height: 1.6;
-      color: var(--slate-600);
-    }
-    body.print-mode .chart-values-note .cv-lead {
-      font-weight: 700;
-      color: var(--slate-500);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    body.print-mode .chart-values-note .cv-group { white-space: nowrap; }
-    body.print-mode .chart-values-note .cv-sep { margin: 0 5px; color: var(--slate-400); }
-    body.print-mode .chart-values-note .cv-chip {
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      margin-right: 2px;
-      border-radius: 1px;
-    }
-
     /* Two columns, and nothing that straddles a page boundary.
        No `align-items: start` here on purpose: the default `stretch` is what
        gives the two cards in a row a shared height. Cards differ in natural
@@ -1423,6 +1407,7 @@
     body.print-mode .pb-mini-label { font-size: 8px; }
     body.print-mode .pb-mini-value { font-size: 12px; }
     body.print-mode .chart-card .c-title { font-size: 13px; margin-bottom: 10px; }
+    body.print-mode .c-title-badges .year-badge { font-size: 9px; padding: 1px 6px; }
     /* Plot heights are chosen so a page fits the header, the KPI row and two
        chart rows without any card having to straddle a page break — hence a
        floor rather than a fixed height: the box grows into the slack when its
@@ -1438,6 +1423,9 @@
       min-height: 310px;
     }
     body.print-mode .chart-box.tall { min-height: 325px; }
+    /* The two Gender plots get 20% more height than the standard print floor
+       (310 -> 372). They share a grid row, so raising both keeps it even. */
+    body.print-mode .chart-box.chart-box-gender { min-height: 372px; }
     /* The country chart sizes itself to the number of bars (inline height set
        in JS), so it is capped rather than fixed. `flex: 1 1 auto` keeps that
        JS height as the starting point — it only ever grows from there, into
@@ -1505,6 +1493,7 @@
         min-height: 310px !important;
       }
       .chart-box.tall { min-height: 325px !important; }
+      .chart-box.chart-box-gender { min-height: 372px !important; }
       .chart-box-country { flex: 1 1 auto !important; max-height: 450px !important; }
       .chart-box canvas { width: 100% !important; height: 100% !important; }
     }
@@ -1664,7 +1653,7 @@
           </div>
         </div>
         <div class="grid2">
-          <div class="chart-card chart-card-full"><div class="c-title">GCB Distribution by Region<span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_gcb')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_gcb')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-subtitle" id="gcbYearLegend"></div><div class="chart-box tall"><canvas id="c_gcb"></canvas></div></div>
+          <div class="chart-card chart-card-full"><div class="c-title">GCB Distribution by Region<span class="c-title-badges" id="gcbYearLegend"></span><span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_gcb')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_gcb')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-box tall"><canvas id="c_gcb"></canvas></div></div>
           <div class="chart-card"><div class="c-title">Year-wise Employee Count by Consolidated Region<span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_yearwise')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_yearwise')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-box"><canvas id="c_yearwise"></canvas></div></div>
           <div class="chart-card">
             <div class="c-title">
@@ -1689,8 +1678,8 @@
               <button type="button" class="axis-scale-btn" id="waterfallAxisZoomInBtn" title="Raise the y-axis starting point (zoom in)" aria-label="Raise the y-axis starting point">+</button>
             </div>
           </div>
-          <div class="chart-card"><div class="c-title">Gender wise Employee Count Across Years<span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_gender_years')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_gender_years')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-box"><canvas id="c_gender_years"></canvas></div></div>
-          <div class="chart-card"><div class="c-title">Gender Distribution by GCB<span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_gcb_gender')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_gcb_gender')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-subtitle" id="gcbGenderYearLegend"></div><div class="chart-box"><canvas id="c_gcb_gender"></canvas></div></div>
+          <div class="chart-card"><div class="c-title">Gender wise Employee Count Across Years<span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_gender_years')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_gender_years')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-box chart-box-gender"><canvas id="c_gender_years"></canvas></div></div>
+          <div class="chart-card"><div class="c-title">Gender Distribution by GCB<span class="c-title-badges" id="gcbGenderYearLegend"></span><span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_gcb_gender')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_gcb_gender')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-box chart-box-gender"><canvas id="c_gcb_gender"></canvas></div></div>
           <div class="chart-card chart-card-full">
             <div class="c-title">
               <span>Origination Team — Year wise Employee Count across Sub-Teams</span>
@@ -2954,11 +2943,7 @@
       anchor: 'center',
       align: 'center',
       font: { weight: '700', size: fontSize, family: "'Inter', sans-serif" },
-      formatter: v => v > 0 ? v.toLocaleString() : '',
-      // Marks a dataset as carrying in-segment value labels that can be
-      // suppressed for want of room, so the print pass knows which datasets to
-      // re-check and list underneath (see suppressedSegments).
-      _stackedSegment: true
+      formatter: v => v > 0 ? v.toLocaleString() : ''
     });
 
     // ─── Single-category doughnut fallback ───
@@ -4647,77 +4632,6 @@
     // layout on screen; each chart is then resized and redrawn synchronously
     // so the canvas the printer receives was drawn at the printed column
     // width, not stretched from the last on-screen render.
-    // ─── Print: values that would not fit inside their segment ───
-    // A stacked segment too small to hold its number is left blank (see
-    // stackedLabelFits), and print makes the bars narrower still. Leader lines
-    // out to the side are not an option: in the two-column print grid the
-    // densest chart gets roughly 16px per bar, while a callout needs about 40px
-    // of clear space, so the leaders would cross neighbouring bars. The dropped
-    // values are therefore listed once beneath the chart, grouped by category
-    // and colour-keyed to their series. Charts where everything fitted get no
-    // note at all.
-    function suppressedSegments(chart){
-      if(!chart || !chart.config || chart.config.type !== "bar") return [];
-      const out = [];
-      chart.data.datasets.forEach((ds, datasetIndex) => {
-        const dl = ds.datalabels;
-        if(!dl || !dl._stackedSegment) return;
-        const meta = chart.getDatasetMeta(datasetIndex);
-        if(meta && meta.hidden) return;
-        const fontSize = (dl.font && dl.font.size) || 11;
-        ds.data.forEach((value, dataIndex) => {
-          if(!(value > 0)) return;
-          if(stackedLabelFits({ chart, dataset: ds, datasetIndex, dataIndex }, fontSize)) return;
-          out.push({
-            categoryIndex: dataIndex,
-            datasetIndex,
-            category: String(chart.data.labels[dataIndex] ?? ""),
-            series: String(ds.label ?? ""),
-            value,
-            color: typeof ds.backgroundColor === "string" ? ds.backgroundColor : HSBC_CHART_COLORS.grey6
-          });
-        });
-      });
-      // Left to right along the x-axis, then bottom to top within a stack, so
-      // the list reads in the same order as the chart above it.
-      out.sort((a,b)=> a.categoryIndex - b.categoryIndex || a.datasetIndex - b.datasetIndex);
-      return out;
-    }
-
-    function renderPrintValueNotes(){
-      Object.keys(state.charts || {}).forEach(id => {
-        const canvas = document.getElementById(id);
-        const card = canvas && canvas.closest(".chart-card");
-        if(!card) return;
-        let note = card.querySelector(".chart-values-note");
-        let missing = [];
-        // A chart that failed to build must not block the whole print.
-        try { missing = suppressedSegments(state.charts[id]); } catch(e) { missing = []; }
-        if(!missing.length){ if(note) note.remove(); return; }
-        if(!note){
-          note = document.createElement("div");
-          note.className = "chart-values-note";
-          card.appendChild(note);
-        }
-        const byCategory = new Map();
-        for(const m of missing){
-          if(!byCategory.has(m.category)) byCategory.set(m.category, []);
-          byCategory.get(m.category).push(m);
-        }
-        const groups = [...byCategory.entries()].map(([category, items]) =>
-          `<span class="cv-group"><b>${escapeHtml(category)}</b> ` +
-          items.map(i =>
-            `<span class="cv-chip" style="background:${escapeHtml(i.color)}"></span>${escapeHtml(i.series)}&nbsp;${i.value.toLocaleString()}`
-          ).join(", ") + `</span>`
-        ).join('<span class="cv-sep">·</span>');
-        note.innerHTML = `<span class="cv-lead">Too small to label:</span> ${groups}`;
-      });
-    }
-
-    function clearPrintValueNotes(){
-      document.querySelectorAll(".chart-values-note").forEach(el => el.remove());
-    }
-
     function setPrintMode(on) {
       document.body.classList.toggle("print-mode", on);
       Object.values(state.charts || {}).forEach(ch => {
@@ -4725,8 +4639,6 @@
         // One chart that failed to build must not block the whole print.
         try { ch.resize(); ch.update("none"); } catch(e) {}
       });
-      // Read after the resize above, so the fit test sees print geometry.
-      if(on) renderPrintValueNotes(); else clearPrintValueNotes();
     }
 
     // The Print button collapses the filters sidebar first so the charts are
@@ -4758,12 +4670,7 @@
         // the browser snapshots the page for the print preview.
         // The sidebar and print-mode are put back by the afterprint handler,
         // which fires whether the print dialog is confirmed or cancelled.
-        requestAnimationFrame(()=>requestAnimationFrame(()=>{
-          // Recompute against the settled layout: the collapsed sidebar widens
-          // every chart, which lets some labels fit that did not a frame ago.
-          renderPrintValueNotes();
-          window.print();
-        }));
+        requestAnimationFrame(()=>requestAnimationFrame(()=>window.print()));
       });
     }
 
@@ -4792,7 +4699,7 @@
       let titleText = chartId;
       if (titleEl) {
         const clone = titleEl.cloneNode(true);
-        clone.querySelectorAll(".chart-actions, .ym-wrap, select").forEach(el => el.remove());
+        clone.querySelectorAll(".chart-actions, .c-title-badges, .ym-wrap, select").forEach(el => el.remove());
         titleText = clone.textContent.trim() || chartId;
       }
 
@@ -4800,7 +4707,9 @@
       // "Each set of N bars per GCB represents: <year badges>" row) lives as
       // plain DOM next to the canvas, so it isn't part of srcCanvas's pixels
       // and has to be redrawn onto the exported image by hand.
-      const subtitleEl = card ? card.querySelector(".chart-subtitle") : null;
+      // Year badges live beside the title on some cards and on a subtitle row of
+      // their own on others; either way they are redrawn as a row in the export.
+      const subtitleEl = card ? card.querySelector(".chart-subtitle, .c-title-badges") : null;
       const subtitleFullText = subtitleEl ? subtitleEl.textContent.replace(/\s+/g, " ").trim() : "";
       const hasSubtitle = subtitleFullText.length > 0;
       const badgeEls = subtitleEl ? [...subtitleEl.querySelectorAll(".year-badge")] : [];

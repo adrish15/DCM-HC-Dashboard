@@ -379,6 +379,49 @@
       color: var(--hsbc-red);
     }
     
+    /* Small key beside the "Filters" heading. Click prompts for the password
+       that reveals the admin filters; clicking it again locks them back
+       away. Pushed to the far right of the heading row by the auto margin. */
+    .sidebar-card h2 .filter-key-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+      margin-left: auto;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--slate-500);
+      cursor: pointer;
+      transition: color .15s ease, background-color .15s ease, border-color .15s ease;
+    }
+
+    .sidebar-card h2 .filter-key-btn svg {
+      width: 13px;
+      height: 13px;
+    }
+
+    .sidebar-card h2 .filter-key-btn:hover {
+      color: var(--hsbc-red);
+      border-color: var(--hsbc-red);
+    }
+
+    /* Unlocked: the key reads as "on" so the extra fields below are clearly
+       an opened state rather than the dashboard's normal view. */
+    .sidebar-card h2 .filter-key-btn[aria-pressed="true"] {
+      background: var(--hsbc-red);
+      border-color: var(--hsbc-red);
+      color: #ffffff;
+    }
+
+    .sidebar-card h2 .filter-key-btn:focus-visible {
+      outline: 2px solid var(--hsbc-red);
+      outline-offset: 2px;
+    }
+
     .filters-body {
       padding: 20px;
       display: flex;
@@ -387,7 +430,26 @@
       max-height: calc(100vh - 280px);
       overflow-y: auto;
     }
-    
+
+    /* Admin filters. Hidden until unlocked — display, not visibility, so
+       they take no space and .filters-body's gap does not leave a hole.
+       Every selector here is qualified with .filters-body so the hidden state
+       outranks the plain `.field { display: flex }` above it, which would
+       otherwise win on source order alone. */
+    .filters-body .admin-field { display: none; }
+    .filters-body.admin-unlocked .admin-field { display: block; }
+    .filters-body.admin-unlocked .field.admin-field { display: flex; }
+
+    .admin-divider {
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--hsbc-red);
+    }
+
     .field {
       display: flex;
       flex-direction: column;
@@ -749,6 +811,15 @@
       min-height: 340px;
     }
 
+    /* The Gender pair sits a row below Year-wise by Region, whose row is
+       stretched by the Movement Type Waterfall beside it — that card carries a
+       year-legend row and the y-axis scaler under its plot, so its row runs 66px
+       taller than a plain one. Matching that here keeps the two rows level
+       rather than leaving the Gender row visibly short. */
+    .chart-box.chart-box-gender {
+      min-height: 366px;
+    }
+
     /* The country chart sizes itself to its bar count via inline height set
        in JS; flex:1 1 auto keeps that as the starting point and only grows
        it into a stretched row's slack, capped so it can't run away. */
@@ -1007,6 +1078,11 @@
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
         gap: 16px;
       }
+      /* The admin heading is a rule across the whole grid here, not a
+         cell competing with the fields it introduces. */
+      .filters-body.admin-unlocked .admin-divider {
+        grid-column: 1 / -1;
+      }
     }
 
     @media(max-width:1280px)
@@ -1136,19 +1212,6 @@
     }
     .chart-subtitle:empty { display: none; }
 
-    /* Year key sitting beside a chart title rather than on a row of its own.
-       .c-title is a flex row with space-between, so margin-right:auto is what
-       makes the badges hug the title text and leaves the action buttons on the
-       right; without it they would drift to the middle. */
-    .c-title-badges {
-      display: inline-flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-right: auto;
-    }
-    .c-title-badges:empty { display: none; }
-    .c-title-badges .year-badge { font-size: 11px; padding: 1px 8px; }
     .chart-subtitle-bottom { margin: 14px 0 0; justify-content: center; }
 
     /* Manual y-axis scaler under the Movement Type Waterfall chart */
@@ -1407,7 +1470,6 @@
     body.print-mode .pb-mini-label { font-size: 8px; }
     body.print-mode .pb-mini-value { font-size: 12px; }
     body.print-mode .chart-card .c-title { font-size: 13px; margin-bottom: 10px; }
-    body.print-mode .c-title-badges .year-badge { font-size: 9px; padding: 1px 6px; }
     /* Plot heights are chosen so a page fits the header, the KPI row and two
        chart rows without any card having to straddle a page break — hence a
        floor rather than a fixed height: the box grows into the slack when its
@@ -1557,27 +1619,16 @@
         <h2>
           <svg class="filter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v2l-7 7v5l-4 2v-7L3 7V5z"/></svg>
           Filters
+          <button type="button" class="filter-key-btn" id="adminUnlockBtn" aria-pressed="false" aria-controls="filtersBody" title="Caution: Unlock Admin filters" aria-label="Caution: Unlock Admin filters">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          </button>
         </h2>
-        <div class="filters-body">
+        <div class="filters-body" id="filtersBody">
           <div class="field">
             <label>Year</label>
             <div class="filter-ym-wrap">
               <button type="button" class="filter-ym-btn" id="f_year_btn" aria-expanded="false" aria-controls="f_year_panel">Select Years</button>
               <div class="filter-ym-panel" id="f_year_panel"></div>
-            </div>
-          </div>
-          <div class="field">
-            <label>Business View</label>
-            <div class="filter-ym-wrap">
-              <button type="button" class="filter-ym-btn" id="f_businessView_btn" aria-expanded="false" aria-controls="f_businessView_panel">All</button>
-              <div class="filter-ym-panel" id="f_businessView_panel"></div>
-            </div>
-          </div>
-          <div class="field">
-            <label>Gender</label>
-            <div class="filter-ym-wrap">
-              <button type="button" class="filter-ym-btn" id="f_gender_btn" aria-expanded="false" aria-controls="f_gender_panel">All</button>
-              <div class="filter-ym-panel" id="f_gender_panel"></div>
             </div>
           </div>
           <div class="field">
@@ -1598,20 +1649,45 @@
             </div>
             <div class="field-note" id="mt2InfoNote" hidden>Selecting Exit/Leaver will deselect the other options. You cannot select any other options while viewing Exits/Leavers.</div>
           </div>
-          <div class="field">
-            <label>Country</label>
+          <!-- Admin filters: hidden until the key beside "Filters" is
+               unlocked with the password. They are always in the DOM (and so
+               always built and wired by the normal filter machinery) — only
+               their visibility is gated. -->
+          <div class="admin-divider admin-field">Admin Filters</div>
+          <div class="field admin-field">
+            <label>Business View</label>
             <div class="filter-ym-wrap">
-              <button type="button" class="filter-ym-btn" id="f_country_btn" aria-expanded="false" aria-controls="f_country_panel">All</button>
-              <div class="filter-ym-panel" id="f_country_panel"></div>
+              <button type="button" class="filter-ym-btn" id="f_businessView_btn" aria-expanded="false" aria-controls="f_businessView_panel">All</button>
+              <div class="filter-ym-panel" id="f_businessView_panel"></div>
             </div>
           </div>
-          <div class="field">
+          <div class="field admin-field">
+            <label>Gender</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_gender_btn" aria-expanded="false" aria-controls="f_gender_panel">All</button>
+              <div class="filter-ym-panel" id="f_gender_panel"></div>
+            </div>
+          </div>
+          <div class="field admin-field">
             <label>DCM HC?</label>
             <div class="filter-ym-wrap">
               <button type="button" class="filter-ym-btn" id="f_dcmHc_btn" aria-expanded="false" aria-controls="f_dcmHc_panel">All</button>
               <div class="filter-ym-panel" id="f_dcmHc_panel"></div>
             </div>
           </div>
+          <div class="field admin-field">
+            <label>GCB</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_gcb_btn" aria-expanded="false" aria-controls="f_gcb_panel">All</button>
+              <div class="filter-ym-panel" id="f_gcb_panel"></div>
+            </div>
+          </div>
+          <!-- FO/Non-FO is visible in both states, so it carries no admin-field
+               class. It is last in the DOM deliberately: with the block above
+               hidden it renders directly under Movement Type 2 as a locked,
+               read-only pin, and once the block is shown it falls into place
+               at the foot of the admin section, where it becomes editable
+               (see isFieldLocked). -->
           <div class="field field-locked">
             <label>FO/Non-FO</label>
             <div class="filter-ym-wrap">
@@ -1653,8 +1729,6 @@
           </div>
         </div>
         <div class="grid2">
-          <div class="chart-card chart-card-full"><div class="c-title">GCB Distribution by Region<span class="c-title-badges" id="gcbYearLegend"></span><span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_gcb')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_gcb')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-box tall"><canvas id="c_gcb"></canvas></div></div>
-          <div class="chart-card"><div class="c-title">Year-wise Employee Count by Consolidated Region<span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_yearwise')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_yearwise')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-box"><canvas id="c_yearwise"></canvas></div></div>
           <div class="chart-card">
             <div class="c-title">
               <span>Movement Type Waterfall</span>
@@ -1678,8 +1752,23 @@
               <button type="button" class="axis-scale-btn" id="waterfallAxisZoomInBtn" title="Raise the y-axis starting point (zoom in)" aria-label="Raise the y-axis starting point">+</button>
             </div>
           </div>
+          <div class="chart-card"><div class="c-title">Year-wise Employee Count by Consolidated Region<span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_yearwise')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_yearwise')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-box"><canvas id="c_yearwise"></canvas></div></div>
+          <div class="chart-card chart-card-full"><div class="c-title">GCB Distribution by Region<span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_gcb')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_gcb')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-box tall"><canvas id="c_gcb"></canvas></div><div class="chart-subtitle chart-subtitle-bottom" id="gcbYearLegend"></div></div>
           <div class="chart-card"><div class="c-title">Gender wise Employee Count Across Years<span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_gender_years')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_gender_years')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-box chart-box-gender"><canvas id="c_gender_years"></canvas></div></div>
-          <div class="chart-card"><div class="c-title">Gender Distribution by GCB<span class="c-title-badges" id="gcbGenderYearLegend"></span><span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_gcb_gender')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_gcb_gender')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span></div><div class="chart-box chart-box-gender"><canvas id="c_gcb_gender"></canvas></div></div>
+          <div class="chart-card">
+            <div class="c-title">
+              <span>Gender Distribution by GCB</span>
+              <span class="c-title-controls">
+                <span class="ym-wrap">
+                  <button class="ym-btn" id="gcbGenderGcbBtn" aria-expanded="false" aria-controls="gcbGenderGcbPanel">GCB</button>
+                  <div class="ym-panel" id="gcbGenderGcbPanel"></div>
+                </span>
+              </span>
+              <span class="chart-actions"><button class="chart-action-btn chart-download-btn" title="Download underlying data (.xlsx)" onclick="downloadChartData('c_gcb_gender')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="btn-tag">Data</span></button><button class="chart-action-btn chart-image-btn" title="Download chart image (.png)" onclick="downloadChartImage('c_gcb_gender')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="btn-tag">Chart</span></button></span>
+            </div>
+            <div class="chart-box chart-box-gender"><canvas id="c_gcb_gender"></canvas></div>
+            <div class="chart-subtitle chart-subtitle-bottom" id="gcbGenderYearLegend"></div>
+          </div>
           <div class="chart-card chart-card-full">
             <div class="c-title">
               <span>Origination Team — Year wise Employee Count across Sub-Teams</span>
@@ -1947,8 +2036,21 @@
     // single source of truth: it drives what applyFilters applies, which
     // dropdowns get built, and which get wired — so a field absent here has
     // no control and no effect on the data.
-    const FILTER_FIELDS = ["year", "businessView", "gender", "movementType", "movementType2", "country", "dcmHc", "fo"];
+    const FILTER_FIELDS = ["year", "movementType", "movementType2", "businessView", "gender", "dcmHc", "gcb", "fo"];
     const SIMPLE_FILTER_FIELDS = FILTER_FIELDS;
+
+    // The tail of the sidebar, hidden behind the key beside the "Filters"
+    // heading (see ADMIN_FILTER_PASSWORD). Gating is presentational only: these
+    // fields are built, wired and applied exactly like the rest, and each one
+    // opens on a default that constrains nothing, so a locked sidebar shows
+    // the same data it always did. Locking them again resets them for that
+    // reason — a filter left narrowed with no visible control would silently
+    // shrink the dashboard.
+    //
+    // FO/Non-FO is the exception that stays on screen throughout: it is listed
+    // here because unlocking hands it over to the reader (and locking pins it
+    // back), not because it is ever hidden.
+    const ADMIN_FILTER_FIELDS = ["businessView", "gender", "dcmHc", "gcb", "fo"];
 
     // A blank movement column is a real answer — "no movement of this kind that
     // year" — so it is offered as its own option rather than quietly dropped.
@@ -2016,14 +2118,22 @@
             ? selection.filter(isExitMovement)
             : selection.filter(v => !isExitMovement(v));
         }
-      },
-      country: { ...VALUE_MULTISELECT, emptyText: "No countries" }
+      }
     };
-    // Filters the user cannot change: they still filter the data and still
+    // Filters the reader cannot change: they still filter the data and still
     // show their value in the sidebar, but are pinned to their default and
     // rendered read-only. FO/Non-FO is fixed to FO because the dashboard
     // reports on front office headcount.
+    //
+    // The pin is a default, not a rule about the data, so it lifts once the
+    // admin filters are unlocked — hence a function rather than a plain
+    // set membership test. Everything that treats a field as locked (its
+    // panel, its button, whether the cascade may reset it) goes through here,
+    // so the two states cannot disagree.
     const LOCKED_FILTER_FIELDS = new Set(["fo"]);
+    function isFieldLocked(field){
+      return LOCKED_FILTER_FIELDS.has(field) && !adminFiltersUnlocked();
+    }
     
     // Shared chart colours. The alias keeps the existing chart configuration
     // concise while the varied palette below restores the original visual style.
@@ -2097,6 +2207,7 @@
       originationSelectedSubTeams: null,
       waterfallYear: null,
       waterfallSelectedRegions: null,
+      gcbGenderSelectedGcbs: null,
       // Manual y-axis floor set by the ±  buttons below the waterfall chart;
       // null means "use the automatic zoom". Reset to null whenever the
       // chart's year or region selection changes, so switching context
@@ -2271,6 +2382,16 @@
       return f;
     }
 
+    // Gender Distribution by GCB has its own GCB multiselect, so it ignores
+    // the sidebar's GCB admin filter — the card's own control owns that
+    // dimension. Every other sidebar filter still applies.
+    function gcbGenderScopedFilters() {
+      const f = {...state.filters};
+      delete f.kpiYear;
+      delete f.gcb;
+      return f;
+    }
+
 
     // Filter defaults have to match the column value exactly, and source files
     // spell the same thing differently ("Y" vs "Yes", "FO" vs "F/O"), so a
@@ -2290,6 +2411,16 @@
     // dashboard imposes.
     const FO_PATTERN = /^f[\/\s-]?o$/i;
     function resolveFoDefault(){ return resolveFilterDefault("fo", FO_PATTERN); }
+
+    // Where every admin filter sits when nobody has touched it: wide open,
+    // apart from the pinned FO/Non-FO. Used both on a clear and when the
+    // filters are locked back away, so the two paths cannot drift apart.
+    function adminFilterDefaults(){
+      const defaults = {};
+      for(const field of ADMIN_FILTER_FIELDS) defaults[field] = "All";
+      defaults.fo = resolveFoDefault();
+      return defaults;
+    }
 
     // Data grouping helpers
     function uniqueCount(records, pred) {
@@ -2342,11 +2473,31 @@
     function renderSimpleFilterPanel(field, opts, cur){
       const panelEl = document.getElementById("f_"+field+"_panel");
       const btnEl = document.getElementById("f_"+field+"_btn");
+      const locked = isFieldLocked(field);
+      // A field that can be locked is re-dressed on every render, because
+      // unlocking the admin filters hands it to the reader: the button
+      // stops being disabled, and the "locked" badge on the label goes with it.
+      if(LOCKED_FILTER_FIELDS.has(field)){
+        const wrapEl = btnEl && btnEl.closest(".field");
+        if(wrapEl) wrapEl.classList.toggle("field-locked", locked);
+        if(btnEl){
+          btnEl.disabled = locked;
+          btnEl.setAttribute("aria-disabled", locked ? "true" : "false");
+          if(locked) btnEl.setAttribute("title", "Fixed scope — this dashboard reports on Front Office staff");
+          else btnEl.removeAttribute("title");
+        }
+      }
       // A locked filter shows its pinned value and nothing else — building the
       // option list would only offer choices the disabled button can't reach.
-      if(LOCKED_FILTER_FIELDS.has(field)){
-        if(panelEl) panelEl.innerHTML = "";
-        if(btnEl) btnEl.textContent = cur;
+      if(locked){
+        if(panelEl){
+          panelEl.innerHTML = "";
+          panelEl.classList.remove("open");
+        }
+        if(btnEl){
+          btnEl.setAttribute("aria-expanded", "false");
+          btnEl.textContent = cur;
+        }
         return;
       }
       if(panelEl){
@@ -2429,7 +2580,7 @@
         // value away — except on locked fields, where widening the scope
         // would quietly undo the pin. Those stay put and show an empty
         // result instead, which is the honest reading of the data.
-        if(cur!=="All" && !opts.includes(cur) && !LOCKED_FILTER_FIELDS.has(field)) cur="All";
+        if(cur!=="All" && !opts.includes(cur) && !isFieldLocked(field)) cur="All";
         state.filters[field]=cur;
         renderSimpleFilterPanel(field, opts, cur);
       }
@@ -2637,6 +2788,45 @@
       renderMovementCharts();
     }
 
+    // Gender Distribution by GCB — own GCB multiselect
+    function gcbGenderBaseRecords(){
+      return applyFilters(state.raw, gcbGenderScopedFilters(), null);
+    }
+
+    function updateGcbGenderMultiselect(){
+      syncCascadingMultiselect({
+        stateKey: "gcbGenderSelectedGcbs",
+        panelId: "gcbGenderGcbPanel",
+        btnId: "gcbGenderGcbBtn",
+        universe: distinctValues(state.raw, "gcb"),
+        available: distinctValues(gcbGenderBaseRecords(), "gcb").sort(gcbSort),
+        // Opens on GCB 2-4, the levels this chart is read for. Matched on the
+        // parsed level rather than the raw string, so files spelling it "GCB3"
+        // land on the same three; falls back to every level when none match, so
+        // the chart can never open empty.
+        defaultSelection: gcbs => {
+          const wanted = gcbs.filter(g => GCB_GENDER_DEFAULT_LEVELS.includes(gcbLevel(g)));
+          return wanted.length ? wanted : [...gcbs];
+        },
+        // Lists the levels rather than counting them, the way the year
+        // multiselects do — "GCB: 2, 3, 4" says at a glance which grades are in
+        // view, where "GCB: 3" only says how many. Sorted numerically so 10
+        // follows 9.
+        label: selected => selected.length
+          ? "GCB: " + selected.slice().sort(gcbSort).join(", ")
+          : "Select GCB",
+        emptyText: "No GCB levels",
+        parse: asText,
+        onChange: onGcbGenderChange
+      });
+    }
+
+    function onGcbGenderChange(){
+      readCascadingMultiselect("gcbGenderSelectedGcbs", "gcbGenderGcbPanel", asText);
+      updateGcbGenderMultiselect();
+      renderGcbGenderChart();
+    }
+
     // Year wise Employee Count across Teams — own Team + Region multiselects
     function teamChartBaseRecords(){
       return applyFilters(state.raw, teamChartScopedFilters(), "team");
@@ -2784,6 +2974,7 @@
     function onCountryRegionChange(){
       readCascadingMultiselect("countrySelectedRegions", "countryRegionPanel", asText);
       syncCountryControls();
+      updateGcbGenderMultiselect();
       renderCountryChart();
     }
 
@@ -2811,6 +3002,7 @@
     function onCountryYearChange(){
       readCascadingMultiselect("countrySelectedYears", "countryYearPanel", Number);
       syncCountryControls();
+      updateGcbGenderMultiselect();
       renderCountryChart();
     }
 
@@ -2825,12 +3017,75 @@
       syncTeamChartControls();
       syncOriginationControls();
       syncCountryControls();
+      updateGcbGenderMultiselect();
       // Chart data: every year in the file, never scoped by kpiYear
       state.filtered = applyFilters(state.raw, chartScopedFilters(), null);
       // KPI data: the latest year only, via kpiYear
       state.kpiFiltered = applyFilters(state.raw, kpiScopedFilters(), null);
       renderAll();
       state._busy = false;
+    }
+
+    // ---- Admin filters ----------------------------------------------------
+    //
+    // The key beside the "Filters" heading reveals the fields in
+    // ADMIN_FILTER_FIELDS. This is a convenience gate, not a security control:
+    // the password sits in the page like everything else here, and it only
+    // decides which controls a reader is shown, never which data the file
+    // contains. Anyone who wants the underlying numbers still has the source
+    // workbook.
+    const ADMIN_FILTER_PASSWORD = "dcm";
+
+    function setAdminFiltersUnlocked(unlocked){
+      const body = document.getElementById("filtersBody");
+      const btn = document.getElementById("adminUnlockBtn");
+      if(body) body.classList.toggle("admin-unlocked", unlocked);
+      if(btn){
+        btn.setAttribute("aria-pressed", unlocked ? "true" : "false");
+        const label = unlocked ? "Lock Admin filters" : "Caution: Unlock Admin filters";
+        btn.setAttribute("title", label);
+        btn.setAttribute("aria-label", label);
+      }
+    }
+
+    function adminFiltersUnlocked(){
+      const body = document.getElementById("filtersBody");
+      return !!(body && body.classList.contains("admin-unlocked"));
+    }
+
+    // Locking puts the admin fields back to their defaults before hiding
+    // them, so the dashboard cannot be left quietly scoped by a control the
+    // reader can no longer see.
+    function lockAdminFilters(){
+      setAdminFiltersUnlocked(false);
+      Object.assign(state.filters, adminFilterDefaults());
+      closeAllSimpleFilterPanels();
+      refresh();
+    }
+
+    async function onAdminKeyClick(){
+      if(adminFiltersUnlocked()){ lockAdminFilters(); return; }
+      let wasWrong = false;
+      // Loops so a typo re-opens the prompt with the hint showing, rather than
+      // making the user find the key again. Cancel (or Escape) exits.
+      for(;;){
+        const entered = await askForPassword({
+          title: "Admin Filters (Caution)",
+          message: "Enter the password to unlock the Admin filters.",
+          wasWrong,
+          errorText: "Incorrect password. Please try again."
+        });
+        if(entered == null) return;
+        if(entered === ADMIN_FILTER_PASSWORD){
+          setAdminFiltersUnlocked(true);
+          // Rebuilds the panels against the new state, which is what hands
+          // FO/Non-FO its option list and lifts its disabled attribute. The
+          // selections themselves are untouched, so the data does not move.
+          refresh();
+          return;
+        }
+        wasWrong = true;
+      }
     }
 
     function clearFilters(){
@@ -2842,15 +3097,15 @@
         year: years.slice(-3), kpiYear: years.slice(-1),
         // null on a multiselect means "not chosen yet", so the panel fills it
         // with its own default on the next render.
-        movementType: null, movementType2: null, country: null,
-        businessView: "All", gender: "All",
-        dcmHc: "All", fo: resolveFoDefault()
+        movementType: null, movementType2: null,
+        ...adminFilterDefaults()
       };
       state.teamChartSelectedTeams=null;
       state.teamChartSelectedRegions=null;
       state.originationSelectedRegions=null;
       state.originationSelectedSubTeams=null;
       state.waterfallSelectedRegions=null;
+      state.gcbGenderSelectedGcbs=null;
       state.countrySelectedRegions=null;
       state.countrySelectedYears=null;
       closeAllSimpleFilterPanels();
@@ -3455,6 +3710,7 @@
 
     const TREND_ICON_SVG = '<svg viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>';
     const PROMOTED_BREAKDOWN_LEVELS = [2, 3, 4, 5];
+    const GCB_GENDER_DEFAULT_LEVELS = [2, 3, 4];
 
     // The GCB column holds a plain level number (2, 3, 4, ...), but files
     // sometimes carry it as "GCB3" / "GCB 3". Reduce either form to the
@@ -3959,7 +4215,9 @@
 
     function renderGroupedYearStackChart(cfg){
       const { canvasId, legendId, groupField, stackField, groupSort, stackSort, centerLabel } = cfg;
-      const f = state.filtered;
+      // Most callers plot the shared filtered set; a card with filters of its
+      // own passes the rows those leave behind.
+      const f = cfg.records || state.filtered;
       const groups = [...new Set(f.map(r=>String(r[groupField]||"").trim()).filter(x=>x))].sort(groupSort);
       const years  = [...new Set(f.map(r=>String(r.year||"").trim()).filter(x=>x))].sort((a,b)=>Number(a)-Number(b));
       const stacks = [...new Set(f.map(r=>String(r[stackField]||"").trim()).filter(x=>x))].sort(stackSort);
@@ -4093,7 +4351,9 @@
     }
 
     function renderGcbGenderChart(){
+      const selectedGcbs = new Set(state.gcbGenderSelectedGcbs || []);
       renderGroupedYearStackChart({
+        records: gcbGenderBaseRecords().filter(r=>selectedGcbs.has(String(r.gcb||"").trim())),
         canvasId: "c_gcb_gender",
         legendId: "gcbGenderYearLegend",
         groupField: "gender",
@@ -4134,17 +4394,22 @@
     }
 
     // Resolves with the entered password, or null if the user cancelled.
-    // wasWrong shows an inline "incorrect password" hint for retries.
-    function promptForPassword(fileName, wasWrong){
+    // Shared by the encrypted-file flow and the admin-filter key, which
+    // differ only in the wording above the input. wasWrong shows an inline
+    // "incorrect password" hint for retries.
+    function askForPassword({title, message, wasWrong, errorText}){
       return new Promise(resolve=>{
         const overlay = document.getElementById("pwModalOverlay");
+        const titleEl = document.getElementById("pwModalTitle");
         const msg = document.getElementById("pwModalMsg");
         const input = document.getElementById("pwModalInput");
         const errorEl = document.getElementById("pwModalError");
         const okBtn = document.getElementById("pwModalOk");
         const cancelBtn = document.getElementById("pwModalCancel");
 
-        msg.textContent = `"${fileName}" is password-protected. Enter the password to continue.`;
+        titleEl.textContent = title;
+        msg.textContent = message;
+        errorEl.textContent = errorText || "Incorrect password. Please try again.";
         errorEl.style.display = wasWrong ? "" : "none";
         input.value = "";
         overlay.classList.add("open");
@@ -4165,6 +4430,14 @@
         okBtn.addEventListener("click", onOk);
         cancelBtn.addEventListener("click", onCancel);
         input.addEventListener("keydown", onKeydown);
+      });
+    }
+
+    function promptForPassword(fileName, wasWrong){
+      return askForPassword({
+        title: "Password required",
+        message: `"${fileName}" is password-protected. Enter the password to continue.`,
+        wasWrong
       });
     }
 
@@ -4473,6 +4746,16 @@
       document.getElementById("btnSelect").addEventListener("click", selectFile);
       document.getElementById("btnRefresh").addEventListener("click", refreshFile);
       document.getElementById("btnReset").addEventListener("click", clearFilters);
+      const adminUnlockBtn = document.getElementById("adminUnlockBtn");
+      if(adminUnlockBtn){
+        adminUnlockBtn.addEventListener("click", e=>{
+          // The sidebar's outside-click handler closes any open filter panel;
+          // stopping here keeps that from also treating the key as a stray
+          // click while the modal is opening.
+          e.stopPropagation();
+          onAdminKeyClick();
+        });
+      }
       document.getElementById("btnClear").addEventListener("click", clearFilters);
       document.getElementById("fileInput").addEventListener("change", e=>{
         const file=e.target.files && e.target.files[0];
@@ -4504,6 +4787,7 @@
       wireYmDropdown("countryRegionBtn", "countryRegionPanel");
       wireYmDropdown("countryYearBtn", "countryYearPanel");
       wireYmDropdown("waterfallYearBtn", "waterfallYearPanel");
+      wireYmDropdown("gcbGenderGcbBtn", "gcbGenderGcbPanel");
 
       // ± buttons that manually raise/lower the waterfall's y-axis floor,
       // read against the bounds renderMovementCharts recomputes every render
@@ -4539,10 +4823,11 @@
       }
 
       // Every sidebar filter is a single-select button + panel; opening one
-      // closes the rest. Locked fields (FO/Non-FO) render read-only and get
-      // no toggle.
+      // closes the rest. FO/Non-FO is wired like the rest even though it opens
+      // locked: its button carries the `disabled` attribute while pinned, which
+      // suppresses the click on its own, and unlocking the admin filters
+      // simply lifts that — no re-wiring needed.
       SIMPLE_FILTER_FIELDS.forEach(field=>{
-        if(LOCKED_FILTER_FIELDS.has(field)) return;
         const btn=document.getElementById("f_"+field+"_btn");
         const panel=document.getElementById("f_"+field+"_panel");
         if(!btn || !panel) return;
@@ -4699,7 +4984,7 @@
       let titleText = chartId;
       if (titleEl) {
         const clone = titleEl.cloneNode(true);
-        clone.querySelectorAll(".chart-actions, .c-title-badges, .ym-wrap, select").forEach(el => el.remove());
+        clone.querySelectorAll(".chart-actions, .ym-wrap, select").forEach(el => el.remove());
         titleText = clone.textContent.trim() || chartId;
       }
 
@@ -4707,9 +4992,7 @@
       // "Each set of N bars per GCB represents: <year badges>" row) lives as
       // plain DOM next to the canvas, so it isn't part of srcCanvas's pixels
       // and has to be redrawn onto the exported image by hand.
-      // Year badges live beside the title on some cards and on a subtitle row of
-      // their own on others; either way they are redrawn as a row in the export.
-      const subtitleEl = card ? card.querySelector(".chart-subtitle, .c-title-badges") : null;
+      const subtitleEl = card ? card.querySelector(".chart-subtitle") : null;
       const subtitleFullText = subtitleEl ? subtitleEl.textContent.replace(/\s+/g, " ").trim() : "";
       const hasSubtitle = subtitleFullText.length > 0;
       const badgeEls = subtitleEl ? [...subtitleEl.querySelectorAll(".year-badge")] : [];
@@ -4813,7 +5096,13 @@
         const isGender = chartId === "c_gcb_gender";
         const groupField = isGender ? "gender" : "gcb";
         const stackField = isGender ? "gcb" : "consolidatedRegion";
-        source = applyFilters(state.raw, chartScopedFilters(), null);
+        if (isGender) {
+          // Own GCB multiselect, and blind to a sidebar GCB filter.
+          const selectedGcbs = new Set(state.gcbGenderSelectedGcbs || []);
+          source = gcbGenderBaseRecords().filter(r => selectedGcbs.has(String(r.gcb || "").trim()));
+        } else {
+          source = applyFilters(state.raw, chartScopedFilters(), null);
+        }
         const seen = new Map(); // key: group||year||stack||uid
         for (const r of source) {
           const g = String(r[groupField] || "").trim();

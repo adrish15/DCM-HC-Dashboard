@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Omnia Apportionment — Dashboard Admin Tool</title>
+<style>
+  :root{
+    --hsbc-red:#DB0011;
+    --hsbc-red-dark:#A6000D;
+    --topbar:#0d0e12;
+    --topbar-2:#1b1d24;
+    --ink:#0f1115;
+    --ink-70:#565a66;
+    --ink-45:#878c99;
+    --line:#e6e8ee;
+    --line-soft:#f0f2f6;
+    --canvas:#faf6f7;
+    --card:#ffffff;
+    --ok:#0b7a4b;
+    --ok-bg:#eefaf3;
+    --warn:#9a5b00;
+    --warn-bg:#fdf6e8;
+    --err:#b3000f;
+    --err-bg:#fdf2f3;
+    --blue:#2a5bd7;
+    --blue-bg:#eef2fd;
+    --violet:#6b3fb5;
+    --violet-bg:#f4effc;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(15,17,21,.04), 0 8px 24px rgba(15,17,21,.05);
+    --mono:"Cascadia Mono",Consolas,"SF Mono",Menlo,"Liberation Mono",monospace;
+    --sans:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    /* faint red wash under the header, fading into the tinted canvas */
+    background:
+      radial-gradient(1100px 460px at 50% -140px, rgba(219,0,17,.09), rgba(219,0,17,0) 72%),
+      var(--canvas);
+    background-attachment:fixed;
+    min-height:100vh;
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:14px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  svg{display:block}
+
+  /* ---------- Header ---------- */
+  .topbar{
+    position:relative;
+    background:linear-gradient(100deg,var(--topbar) 0%,var(--topbar-2) 100%);
+    color:#fff;
+    padding:20px 30px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:20px;
+    overflow:hidden;
+  }
+  .topbar::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='112' height='128' viewBox='0 0 112 128'><g fill='none' stroke='white' stroke-opacity='0.07' stroke-width='1.2'><path d='M56 6 L92 27 L92 69 L56 90 L20 69 L20 27 Z'/><path d='M0 69 L20 80'/><path d='M112 69 L92 80'/></g></svg>");
+    background-size:112px 128px;
+    pointer-events:none;
+  }
+  .brand{display:flex;align-items:center;gap:15px;position:relative;z-index:1;min-width:0}
+  .brand-mark{display:block;width:34px;height:34px;flex:none;border-radius:4px}
+  .brand h1{
+    margin:0;font-size:19px;font-weight:700;letter-spacing:-.3px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;
+  }
+  .brand p{margin:2px 0 0;font-size:12.5px;opacity:.7;font-weight:400}
+  .topbar-note{
+    position:relative;z-index:1;display:flex;align-items:center;gap:7px;
+    font-size:12.5px;color:rgba(255,255,255,.72);white-space:nowrap;
+  }
+  .topbar-note svg{width:15px;height:15px;flex:none}
+
+  /* ---------- Layout ---------- */
+  .wrap{max-width:1500px;margin:0 auto;padding:24px 24px 64px}
+  .grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:22px;align-items:stretch}
+  /* Run log card matches the Inputs card height; the console takes up the slack
+     so the stats and warnings table keep their natural size at the bottom. */
+  #logCard{display:flex;flex-direction:column}
+  #logCard .log{flex:1;height:auto;min-height:230px}
+  .grid-single{grid-template-columns:minmax(0,1fr);margin-top:22px}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:24px 26px 26px;
+  }
+
+  /* ---------- Card header ---------- */
+  .card-head{display:flex;align-items:center;gap:13px;margin-bottom:22px}
+  .card-head h2{margin:0;font-size:13px;font-weight:800;letter-spacing:.7px;text-transform:uppercase}
+  .card-head p{margin:2px 0 0;font-size:12.5px;color:var(--ink-45);font-weight:400}
+  .card-head .grow{flex:1;min-width:0}
+  .card-ico{
+    width:38px;height:38px;flex:none;border-radius:11px;
+    display:grid;place-items:center;
+  }
+  .card-ico svg{width:19px;height:19px;stroke-width:1.9}
+  .i-red{background:#fdeef0;color:var(--hsbc-red)}
+  .i-green{background:var(--ok-bg);color:var(--ok)}
+  .i-blue{background:var(--blue-bg);color:var(--blue)}
+  .i-amber{background:var(--warn-bg);color:var(--warn)}
+  .i-violet{background:var(--violet-bg);color:var(--violet)}
+
+  .pill{
+    display:inline-flex;align-items:center;gap:7px;flex:none;
+    font-size:12px;font-weight:600;border-radius:999px;padding:5px 12px;
+    background:var(--ok-bg);color:var(--ok);border:1px solid #cbead9;
+  }
+  .pill i{width:7px;height:7px;border-radius:50%;background:currentColor;display:block}
+  .pill.busy{background:var(--warn-bg);color:var(--warn);border-color:#f0dcb4}
+  .pill.done{background:var(--blue-bg);color:var(--blue);border-color:#c8d5f6}
+  .pill.bad{background:var(--err-bg);color:var(--err);border-color:#f2c9cd}
+
+  /* ---------- Fields ---------- */
+  .field-label{
+    display:flex;align-items:center;gap:9px;
+    font-size:13px;font-weight:650;margin-bottom:9px;color:var(--ink);
+  }
+  .step{
+    width:21px;height:21px;flex:none;border-radius:50%;background:var(--hsbc-red);color:#fff;
+    display:grid;place-items:center;font-size:11px;font-weight:700;line-height:1;
+  }
+  .hint{font-size:12px;color:var(--ink-45);margin-top:9px;line-height:1.5}
+  .hint b{color:var(--ink-70);font-weight:600}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .three-col{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+  .row-gap{margin-top:26px;padding-top:26px;border-top:1px solid var(--line-soft)}
+
+  /* ---------- File drop ---------- */
+  .drop{
+    border:1.5px dashed #d5d9e2;border-radius:12px;background:#fcfcfd;
+    padding:20px 16px 18px;text-align:center;
+    transition:border-color .15s,background .15s;
+  }
+  .drop.dragover{border-color:var(--hsbc-red);background:#fff5f6}
+  .drop.loaded{border-style:solid;border-color:#cbe7d8;background:#fbfefc}
+  .drop.bad{border-color:var(--err);background:var(--err-bg)}
+  .drop-ico{width:32px;height:32px;margin:0 auto;color:var(--hsbc-red);opacity:.8;stroke-width:1.6}
+  .drop.loaded .drop-ico{color:var(--ok)}
+  .drop.bad .drop-ico{color:var(--err)}
+  .drop-cta{margin:10px 0 3px;font-size:13px;color:var(--ink-70)}
+  .drop-or{margin:0 0 11px;font-size:11.5px;color:var(--ink-45)}
+  .btn-file{
+    font-family:inherit;font-size:13px;font-weight:600;color:var(--ink);
+    background:#fff;border:1px solid #d0d4dd;border-radius:8px;padding:8px 16px;cursor:pointer;
+    white-space:nowrap;box-shadow:0 1px 1px rgba(15,17,21,.04);
+  }
+  .btn-file:hover{border-color:#a8aebb;background:#f8f9fb}
+  .file-name{
+    display:block;margin-top:10px;font-size:12px;color:var(--ink-45);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .file-name.set{color:var(--ink);font-weight:600}
+  .sheet-pick{margin-top:14px;display:none;text-align:left}
+  .sheet-pick.show{display:block}
+  .sheet-pick label{font-size:12px;color:var(--ink-70);display:block;margin-bottom:5px}
+  input[type=file]{display:none}
+
+  input[type=text], textarea, select{
+    width:100%;font-family:inherit;font-size:13px;color:var(--ink);
+    background:#fff;border:1px solid #d0d4dd;border-radius:9px;padding:10px 12px;
+  }
+  textarea{font-family:var(--mono);font-size:12.5px;line-height:1.6;resize:vertical;min-height:92px}
+  input[type=text]:focus, textarea:focus, select:focus{
+    outline:2px solid rgba(219,0,17,.28);outline-offset:1px;border-color:var(--hsbc-red);
+  }
+  .num-inline{display:flex;align-items:stretch;gap:0;max-width:190px}
+  .num-inline input{flex:1;min-width:0;border-radius:9px 0 0 9px;border-right:none}
+  .num-inline .unit{
+    display:grid;place-items:center;padding:0 14px;font-size:12.5px;color:var(--ink-70);
+    background:#f5f6f9;border:1px solid #d0d4dd;border-radius:0 9px 9px 0;
+  }
+
+  /* ---------- Buttons ---------- */
+  .actions{display:flex;align-items:center;gap:11px;margin-top:26px;flex-wrap:wrap}
+  .btn{
+    display:inline-flex;align-items:center;gap:9px;
+    font-family:inherit;font-size:13.5px;font-weight:650;border-radius:9px;
+    padding:11px 19px;cursor:pointer;border:1px solid transparent;letter-spacing:.1px;
+    transition:background .15s,border-color .15s;
+  }
+  .btn svg{width:16px;height:16px;flex:none;stroke-width:2}
+  .btn-primary{background:var(--hsbc-red);color:#fff;box-shadow:0 1px 2px rgba(219,0,17,.25)}
+  .btn-primary:hover:not([disabled]){background:var(--hsbc-red-dark)}
+  .btn-quiet{background:#fff;color:var(--ink);border-color:#d0d4dd;box-shadow:0 1px 1px rgba(15,17,21,.04)}
+  .btn-quiet:hover:not([disabled]){background:#f8f9fb;border-color:#a8aebb}
+  .btn[disabled]{opacity:.42;cursor:not-allowed;box-shadow:none}
+  .btn:focus-visible,.btn-file:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+  /* ---------- Tip + banner ---------- */
+  .tip{
+    display:flex;align-items:flex-start;gap:10px;margin-top:22px;
+    border:1px solid #f5dade;background:#fdf6f7;border-radius:10px;padding:12px 14px;
+    font-size:12.5px;color:var(--ink-70);line-height:1.5;
+  }
+  .tip svg{width:16px;height:16px;flex:none;color:var(--hsbc-red);margin-top:1px;stroke-width:1.8}
+  .banner{
+    display:none;margin-top:14px;border-radius:10px;padding:12px 14px;font-size:13px;
+    border:1px solid;line-height:1.45;
+  }
+  .banner.show{display:block}
+  .banner.err{border-color:#f2c9cd;background:var(--err-bg);color:var(--err)}
+  .banner.ok{border-color:#c3e6d3;background:var(--ok-bg);color:var(--ok)}
+
+  /* ---------- Run log ---------- */
+  .log{
+    background:#fbfbfc;border:1px solid var(--line);border-radius:12px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.7;
+    padding:15px 17px;height:230px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;
+  }
+  .log .l-info{color:var(--ink-70)}
+  .log .l-step{color:var(--ink);font-weight:600}
+  .log .l-ok{color:var(--ok)}
+  .log .l-warn{color:var(--warn)}
+  .log .l-err{color:var(--err);font-weight:600}
+  .log .ts{color:#a3a8b4}
+
+  /* ---------- Stat tiles ---------- */
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:20px}
+  .stat{
+    display:flex;align-items:center;gap:12px;min-width:0;
+    border:1px solid var(--line);border-radius:12px;padding:13px 15px;background:#fff;
+  }
+  .stat-ico{width:36px;height:36px;flex:none;border-radius:10px;display:grid;place-items:center}
+  .stat-ico svg{width:18px;height:18px;stroke-width:1.9}
+  .stat .k{font-size:11.5px;color:var(--ink-45);line-height:1.35}
+  .stat .v{font-size:22px;font-weight:750;letter-spacing:-.6px;font-variant-numeric:tabular-nums;line-height:1.2}
+  .stat.flag{border-color:#f0dcb4;background:#fffcf5}
+  .stat.flag .v{color:var(--warn)}
+
+  /* ---------- Warnings ---------- */
+  .warn-head{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin:26px 0 14px}
+  .warn-head svg{width:17px;height:17px;flex:none;color:var(--hsbc-red);stroke-width:1.9}
+  .warn-head h3{margin:0;font-size:12.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;flex:1}
+  .chip{
+    font-size:11.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;
+    padding:4px 11px;color:var(--ink-70);background:#fafbfc;font-variant-numeric:tabular-nums;
+  }
+  .chip.hot{border-color:#f0dcb4;background:var(--warn-bg);color:var(--warn)}
+
+  .tbl-scroll{border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:270px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead th{
+    position:sticky;top:0;background:#f7f8fa;text-align:left;font-weight:700;
+    padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:1;
+    font-size:11.5px;letter-spacing:.3px;color:var(--ink-70);text-transform:uppercase;
+  }
+  tbody td{padding:9px 14px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+  td.key{font-family:var(--mono);max-width:340px;overflow:hidden;text-overflow:ellipsis}
+  .tag{font-size:11px;font-weight:700;border-radius:5px;padding:2px 8px}
+  .tag.code{background:var(--blue-bg);color:var(--blue)}
+  .tag.name{background:var(--violet-bg);color:var(--violet)}
+  .empty{
+    padding:66px 16px 30px;text-align:center;color:var(--ink-45);font-size:12.5px;
+    background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23c3c7d1' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'><path d='M22 12h-6l-2 3h-4l-2-3H2'/><path d='M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'/></svg>") no-repeat center 24px;
+    background-size:32px;
+  }
+
+  code{font-family:var(--mono);font-size:12px;background:#f1f3f7;border-radius:5px;padding:1px 6px}
+  #embedCard .stats{margin-top:0}
+
+  @media (max-width:1180px){
+    .grid{grid-template-columns:1fr}
+  }
+  @media (max-width:640px){
+    .wrap{padding:16px 14px 40px}
+    .card{padding:18px 17px 20px}
+    .two-col,.three-col{grid-template-columns:1fr;gap:20px}
+    .stats{grid-template-columns:1fr}
+    .topbar{padding:15px 17px}
+    .topbar-note{display:none}
+    .brand h1{font-size:16px;white-space:normal}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="HSBC">
+      <path d="M16.028 15.99h31.98v31.98h-31.98z" fill="#fff"/>
+      <path d="M64 32.02L48 16v32zm-31.98 0L48 16H16.03zM0 32.02l16.028 16V16zm32.02 0l-16 16H48z" fill="#db0011"/>
+    </svg>
+    <div>
+      <h1>Omnia Apportionment — Dashboard Admin Tool</h1>
+      <p>Sponsor mapping, ownership apportionment and Excel export</p>
+    </div>
+  </div>
+  
+</header>
+
+<div class="wrap">
+  <div class="grid">
+
+    <!-- ================= INPUTS ================= -->
+    <section class="card" id="inputsCard">
+      <div class="card-head">
+        <span class="card-ico i-red">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M12 11v5m0-5l-2 2m2-2l2 2"/></svg>
+        </span>
+        <div class="grow">
+          <h2>Inputs</h2>
+          <p>Upload files and configure apportionment settings</p>
+        </div>
+      </div>
+
+      <div class="three-col">
+        <div>
+          <label class="field-label" for="ytdBtn"><span class="step">1</span>Omnia YTD file (.xlsx)</label>
+          <div class="drop" id="ytdDrop">
+            <svg class="drop-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6m0 0l-2.2 2.2M12 12l2.2 2.2"/></svg>
+            <p class="drop-cta">Drag &amp; drop file here</p>
+            <p class="drop-or">or</p>
+            <button class="btn-file" id="ytdBtn" type="button">Choose file</button>
+            <span class="file-name" id="ytdName">No file chosen</span>
+            <div class="sheet-pick" id="ytdSheetWrap">
+              <label for="ytdSheet">Sheet</label>
+              <select id="ytdSheet"></select>
+            </div>
+          </div>
+          <input type="file" id="ytdInput" accept=".xlsx,.xlsm,.xls,.csv">
+          <p class="hint">The left side of the join — every YTD row is kept. Needs <b>Year</b>, <b>Managed Region</b>, <b>Mastergroup</b>, <b>Mastergroup Code</b>, plus measure columns.</p>
+        </div>
+
+        <div>
+          <label class="field-label" for="mtdBtn"><span class="step">2</span>Omnia MTD file (.xlsx)</label>
+          <div class="drop" id="mtdDrop">
+            <svg class="drop-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6m0 0l-2.2 2.2M12 12l2.2 2.2"/></svg>
+            <p class="drop-cta">Drag &amp; drop file here</p>
+            <p class="drop-or">or</p>
+            <button class="btn-file" id="mtdBtn" type="button">Choose file</button>
+            <span class="file-name" id="mtdName">No file chosen</span>
+            <div class="sheet-pick" id="mtdSheetWrap">
+              <label for="mtdSheet">Sheet</label>
+              <select id="mtdSheet"></select>
+            </div>
+          </div>
+          <input type="file" id="mtdInput" accept=".xlsx,.xlsm,.xls,.csv">
+          <p class="hint">Looked up against YTD on the same four key columns. Non-matching MTD rows are ignored.</p>
+        </div>
+
+        <div>
+          <label class="field-label" for="mapBtn"><span class="step">3</span>Sponsor mapping file (.xlsx)</label>
+          <div class="drop" id="mapDrop">
+            <svg class="drop-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6m0 0l-2.2 2.2M12 12l2.2 2.2"/></svg>
+            <p class="drop-cta">Drag &amp; drop file here</p>
+            <p class="drop-or">or</p>
+            <button class="btn-file" id="mapBtn" type="button">Choose file</button>
+            <span class="file-name" id="mapName">No file chosen</span>
+            <div class="sheet-pick" id="mapSheetWrap">
+              <label for="mapSheet">Sheet</label>
+              <select id="mapSheet"></select>
+            </div>
+          </div>
+          <input type="file" id="mapInput" accept=".xlsx,.xlsm,.xls,.csv">
+          <p class="hint">Required columns: <b>PORTFOLIO_MG_NAME</b>, <b>PORTFOLIO_ESR_MG_ID</b>, <b>FS_MG_NAME</b>, <b>PERCENTAGE_OWNERSHIP</b>, <b>Priority</b>.</p>
+        </div>
+      </div>
+
+      <div class="two-col row-gap">
+        <div>
+          <label class="field-label" for="measures"><span class="step">4</span>Measure columns (comma-separated)</label>
+          <textarea id="measures" spellcheck="false">Net Direct Income ($M), Total RWA ($M), Total Relationship Income ($M), Utilisation ($M), Limit ($M)</textarea>
+          <p class="hint">These will be apportioned by ownership where mapping exists.</p>
+        </div>
+        <div>
+          <label class="field-label" for="tolerance"><span class="step">5</span>Ownership tolerance</label>
+          <div class="num-inline">
+            <input type="text" id="tolerance" value="0.5" inputmode="decimal">
+            <span class="unit">%</span>
+          </div>
+          <p class="hint">Flag clients whose sponsor ownership doesn't total 100%.</p>
+        </div>
+      </div>
+
+      <div class="two-col row-gap">
+        <div>
+          <label class="field-label" for="outName"><span class="step">6</span>Output file name</label>
+          <input type="text" id="outName" value="Omnia_Mapped - mmm yyyy.xlsx" spellcheck="false">
+        </div>
+        <div>
+          <label class="field-label" for="sheetName"><span class="step">7</span>First sheet name</label>
+          <input type="text" id="sheetName" value="Omnia_Apportioned" spellcheck="false">
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="runBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l13 8-13 8z"/></svg>
+          <span class="btn-label">Run apportioning</span>
+        </button>
+        <button class="btn btn-quiet" id="dlBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          <span class="btn-label">Download output</span>
+        </button>
+        <button class="btn btn-quiet" id="resetBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 11-2.6-5.9"/><path d="M20 3v5h-5"/></svg>
+          <span class="btn-label">Reset</span>
+        </button>
+      </div>
+
+      <div class="tip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9V16h7v-2.1A6 6 0 0012 3z"/></svg>
+        <span>All three files must be .xlsx (or .csv) and contain the required columns listed above.</span>
+      </div>
+
+      <div class="banner" id="banner"></div>
+    </section>
+
+    <!-- ================= RUN LOG ================= -->
+    <section class="card" id="logCard">
+      <div class="card-head">
+        <span class="card-ico i-red">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+        </span>
+        <div class="grow">
+          <h2>Run log</h2>
+          <p>Track progress and results</p>
+        </div>
+        <span class="pill" id="statusPill"><i></i>System ready</span>
+      </div>
+
+      <div class="log" id="log" aria-live="polite" role="log"></div>
+
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-ico i-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><rect x="3" y="13" width="18" height="5" rx="1.5"/></svg></span>
+          <div><div class="k">Rows before</div><div class="v" id="sRowsBefore">—</div></div>
+        </div>
+        <div class="stat">
+          <span class="stat-ico i-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="4.5" rx="1.5"/><rect x="3" y="9.75" width="18" height="4.5" rx="1.5"/><rect x="3" y="16.5" width="18" height="4.5" rx="1.5"/></svg></span>
+          <div><div class="k">Rows after</div><div class="v" id="sRowsAfter">—</div></div>
+        </div>
+        <div class="stat" id="statMissing">
+          <span class="stat-ico i-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-1.5a3.5 3.5 0 00-3.5-3.5h-5A3.5 3.5 0 004 18.5V20"/><circle cx="10" cy="8" r="3.5"/><path d="M20 20v-1.5a3.5 3.5 0 00-2.6-3.4"/></svg></span>
+          <div><div class="k">Clients missing mapping</div><div class="v" id="sMissing">—</div></div>
+        </div>
+        <div class="stat" id="statBad">
+          <span class="stat-ico i-violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/></svg></span>
+          <div><div class="k">Ownership totals not ~100%</div><div class="v" id="sBad">—</div></div>
+        </div>
+      </div>
+
+      <div class="warn-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-2.5 9-2.5 9h17S18 15 18 8"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        <h3>Ownership warnings (first 50)</h3>
+        <span class="chip" id="chipTotal">Total warnings: —</span>
+        <span class="chip" id="chipCode">Code: —</span>
+        <span class="chip" id="chipName">Name: —</span>
+      </div>
+      <div class="tbl-scroll">
+        <table id="warnTable">
+          <thead><tr><th>Type</th><th>Join key</th><th>Total ownership</th></tr></thead>
+          <tbody><tr><td colspan="3" class="empty">No data yet. Run apportioning to see results.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= EMBED INTO DASHBOARD HTML ================= -->
+  <div class="grid grid-single">
+    <section class="card" id="embedCard">
+      <div class="card-head">
+        <span class="card-ico i-blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/></svg>
+        </span>
+        <div class="grow">
+          <h2>Embed into dashboard HTML</h2>
+          <p>Write the apportioned output into the dashboard file as a compressed constant</p>
+        </div>
+      </div>
+
+      <p class="hint" style="margin:0 0 20px;max-width:88ch">The output is written as
+        <code>const OMNIA_COL_JSON_GZ_B64</code> — columnar JSON (one key per column, each holding that
+        column's values) gzipped, then Base64. An existing constant is replaced in place; if there isn't
+        one, it is inserted on the line directly above <code>const OMNIA_COL_JSON</code>.</p>
+
+      <div class="two-col">
+        <div>
+          <label class="field-label" for="tplBtn"><span class="step">8</span>Dashboard file (.html)</label>
+          <div class="drop" id="tplDrop">
+            <svg class="drop-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6m0 0l-2.2 2.2M12 12l2.2 2.2"/></svg>
+            <p class="drop-cta">Drag &amp; drop file here</p>
+            <p class="drop-or">or</p>
+            <button class="btn-file" id="tplBtn" type="button">Choose file</button>
+            <span class="file-name" id="tplName">No file chosen</span>
+          </div>
+          <input type="file" id="tplInput" accept=".html,.htm">
+          <p class="hint">Run apportioning first — embedding stays disabled until there is output to write.</p>
+        </div>
+        <div>
+          <span class="field-label">Payload</span>
+          <div class="stats">
+            <div class="stat">
+              <span class="stat-ico i-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></span>
+              <div><div class="k">JSON, uncompressed</div><div class="v" id="sJsonSize">—</div></div>
+            </div>
+            <div class="stat">
+              <span class="stat-ico i-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8"/><rect x="2" y="3" width="20" height="5" rx="1.5"/><path d="M10 12h4"/></svg></span>
+              <div><div class="k">Base64, as embedded</div><div class="v" id="sB64Size">—</div></div>
+            </div>
+          </div>
+          <p class="hint" id="embedNote">Nothing embedded yet.</p>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="embedBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-11m0 0l-4 4m4-4l4 4"/><path d="M4 7V5a2 2 0 012-2h12a2 2 0 012 2v2"/></svg>
+          <span class="btn-label">Embed &amp; download HTML</span>
+        </button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- SheetJS Community Edition 0.18.5 -- https://sheetjs.com/ -- Apache-2.0 licensed.
+     Loaded from CDN (SRI-pinned) instead of bundled inline, to keep this file small.
+     This means the tool now needs internet access for Excel import/export. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+        integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+/* If the CDN is blocked or unreachable, say so up front rather than dying with
+   "XLSX is not defined" inside an import/export handler. */
+window.addEventListener("DOMContentLoaded", function(){
+  if (typeof XLSX !== "undefined") return;
+  var bar = document.createElement("div");
+  bar.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:9999;padding:10px 14px;"
+    + "background:#7f1d1d;color:#fff;font:600 13px/1.45 system-ui,-apple-system,sans-serif;text-align:center";
+  bar.textContent = "SheetJS (xlsx) could not be loaded from the CDN, so Excel import and export are "
+    + "unavailable. Check your internet connection or firewall, then reload this page.";
+  document.body.appendChild(bar);
+});
+</script>
+
+<script>
+(function(){
+"use strict";
+
+/* =====================================================================
+   Configuration — mirrors the Python script constants
+   ===================================================================== */
+var KEY_OMNIA_NAME   = "Mastergroup";
+var KEY_OMNIA_CODE   = "Mastergroup Code";
+var KEY_MAP_NAME     = "PORTFOLIO_MG_NAME";
+var KEY_MAP_CODE     = "PORTFOLIO_ESR_MG_ID";
+var SPONSOR_COL      = "FS_MG_NAME";
+var SPONSOR_OUT_COL  = "Sponsor Mastergroup";
+var OWNERSHIP_COL    = "PERCENTAGE_OWNERSHIP";
+var PRIORITY_COL     = "Priority";
+var PRIORITY_OUT_COL = "Priority";
+var EXCEL_MAX_ROWS   = 1048576;   // hard Excel sheet limit, header included
+
+/* The Omnia table is built here: YTD left-joined with MTD on these four columns.
+   An MTD column whose name already exists in YTD is carried across with MTD_SUFFIX. */
+var JOIN_KEYS  = ["Year", "Managed Region", KEY_OMNIA_NAME, KEY_OMNIA_CODE];
+var MTD_SUFFIX = " MTD";
+
+var ZERO_WIDTH_RE = /[\u200b-\u200d\ufeff]/g;
+
+/* =====================================================================
+   State
+   ===================================================================== */
+var state = {
+  ytd:   null,   // {fileName, sheetNames, wb, columns, rows}
+  mtd:   null,
+  map:   null,
+  omnia: null,   // derived: ytd left-joined with mtd, built at run time
+  out:   null,   // {columns, rows, sheetName, fileName}
+  tpl:   null    // {fileName, text} — dashboard HTML to embed the output into
+};
+
+/* =====================================================================
+   DOM shortcuts
+   ===================================================================== */
+function $(id){ return document.getElementById(id); }
+var logEl = $("log");
+
+/* =====================================================================
+   Logging
+   ===================================================================== */
+function stamp(){
+  var d = new Date();
+  function p(n){ return (n<10?"0":"")+n; }
+  return p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds());
+}
+function log(msg, cls){
+  var line = document.createElement("div");
+  line.className = "l-" + (cls || "info");
+  var t = document.createElement("span");
+  t.className = "ts";
+  t.textContent = stamp() + "  ";
+  line.appendChild(t);
+  line.appendChild(document.createTextNode(msg));
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function clearLog(){ logEl.textContent = ""; }
+function banner(msg, kind){
+  var b = $("banner");
+  b.className = "banner show " + kind;
+  b.textContent = msg;
+}
+function hideBanner(){ $("banner").className = "banner"; }
+
+/* Buttons carry an icon plus a .btn-label span, so swap the label only —
+   writing to button.textContent would wipe the icon out. */
+function btnLabel(id, text){
+  var el = $(id).querySelector(".btn-label"), was = el.textContent;
+  if (text !== undefined) el.textContent = text;
+  return was;
+}
+function setStatus(text, kind){
+  var p = $("statusPill");
+  p.className = "pill" + (kind ? " " + kind : "");
+  p.innerHTML = "<i></i>";
+  p.appendChild(document.createTextNode(text));
+}
+function fmt(n){ return Number(n).toLocaleString("en-US"); }
+function yieldUI(){ return new Promise(function(r){ setTimeout(r, 0); }); }
+
+/* =====================================================================
+   Key normalisation — mirrors _normalise_client_key / _normalise_code_key
+   ===================================================================== */
+function normName(v){
+  if (v === null || v === undefined) return null;
+  if (v instanceof Date) v = v.toISOString();
+  var x = String(v);
+  x = x.replace(/\u00a0/g, " ").replace(ZERO_WIDTH_RE, "");
+  x = x.trim().replace(/\s+/g, " ").toLowerCase();
+  return x === "" ? null : x;
+}
+function normCode(v){
+  if (v === null || v === undefined) return null;
+  if (v instanceof Date) v = v.toISOString();
+  var x = String(v);
+  x = x.replace(/\u00a0/g, " ").replace(ZERO_WIDTH_RE, "");
+  x = x.trim().replace(/\s+/g, "");
+  x = x.replace(/\.0$/, "");
+  x = x.toLowerCase();
+  return x === "" ? null : x;
+}
+function cleanStr(v){
+  if (v === null || v === undefined) return null;
+  var x = String(v).trim();
+  return x === "" ? null : x;
+}
+
+/* =====================================================================
+   Ownership normalisation — mirrors normalise_ownership
+   "50%" -> 0.5 | 50 -> 0.5 | 0.5 -> 0.5 | blank/junk -> NaN
+   ===================================================================== */
+function normOwnership(v){
+  if (v === null || v === undefined) return NaN;
+  var s = String(v).replace(/ /g, "").trim();
+  if (s === "") return NaN;
+  var hasPct = s.indexOf("%") !== -1;
+  var num = Number(s.replace(/%/g, "").trim());
+  if (!isFinite(num)) return NaN;
+  var frac = hasPct ? num / 100 : num;
+  if (frac > 1) frac = frac / 100;
+  return frac;
+}
+
+/* =====================================================================
+   Measure coercion — mirrors _coerce_numeric_measures
+   ===================================================================== */
+function coerceMeasure(v){
+  if (v === null || v === undefined) return NaN;
+  if (typeof v === "number") return isFinite(v) ? v : NaN;
+  var s = String(v).replace(/,/g, "").trim();
+  if (s === "" || s === "-" || s === "None") return NaN;
+  var n = Number(s);
+  return isFinite(n) ? n : NaN;
+}
+
+/* =====================================================================
+   Workbook reading
+   ===================================================================== */
+function readWorkbook(file){
+  return new Promise(function(resolve, reject){
+    var fr = new FileReader();
+    fr.onerror = function(){ reject(new Error("Could not read " + file.name)); };
+    fr.onload = function(e){
+      try{
+        var wb = XLSX.read(new Uint8Array(e.target.result), {type:"array", cellDates:true, dense:true});
+        resolve(wb);
+      }catch(err){ reject(err); }
+    };
+    fr.readAsArrayBuffer(file);
+  });
+}
+
+function sheetToTable(wb, sheetName){
+  var ws = wb.Sheets[sheetName];
+  if (!ws) throw new Error("Sheet not found: " + sheetName);
+  var aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, blankrows:false});
+  if (!aoa.length) return {columns:[], rows:[]};
+
+  var header = aoa[0].map(function(h, i){
+    var name = (h === null || h === undefined) ? "" : String(h).replace(/\u00a0/g," ").replace(ZERO_WIDTH_RE,"").trim();
+    return name === "" ? ("Column " + (i+1)) : name;
+  });
+  // de-duplicate header names so column lookups stay unambiguous
+  var seen = Object.create(null);
+  header = header.map(function(h){
+    if (seen[h] === undefined){ seen[h] = 1; return h; }
+    seen[h] += 1;
+    return h + " (" + seen[h] + ")";
+  });
+
+  var rows = [];
+  for (var r = 1; r < aoa.length; r++){
+    var src = aoa[r], row = new Array(header.length), blank = true;
+    for (var c = 0; c < header.length; c++){
+      var v = (src && c < src.length) ? src[c] : null;
+      if (v === undefined) v = null;
+      if (v !== null && v !== "") blank = false;
+      row[c] = v;
+    }
+    if (!blank) rows.push(row);
+  }
+  return {columns:header, rows:rows};
+}
+
+/* =====================================================================
+   Build the Omnia table: Omnia YTD left-joined with Omnia MTD
+   Key: Year + Managed Region + Mastergroup + Mastergroup Code.
+   Every YTD row survives; unmatched rows get blanks in the MTD columns.
+   ===================================================================== */
+function joinKeyNorm(col, v){
+  // Year and Mastergroup Code are code-like (strip spaces and a trailing .0);
+  // Managed Region and Mastergroup are free text.
+  return (col === "Year" || col === KEY_OMNIA_CODE) ? normCode(v) : normName(v);
+}
+
+function compositeKey(row, idx){
+  var parts = new Array(JOIN_KEYS.length);
+  for (var k = 0; k < JOIN_KEYS.length; k++){
+    var v = joinKeyNorm(JOIN_KEYS[k], row[idx[k]]);
+    if (v === null) return null;          // a blank key part can never match
+    parts[k] = v;
+  }
+  return parts.join("");
+}
+
+function joinYtdMtd(ytd, mtd){
+  [["Omnia YTD", ytd], ["Omnia MTD", mtd]].forEach(function(p){
+    var miss = JOIN_KEYS.filter(function(c){ return p[1].columns.indexOf(c) === -1; });
+    if (miss.length) throw new Error(p[0] + " is missing join column(s): " + miss.join(", "));
+  });
+
+  var yIdx = JOIN_KEYS.map(function(c){ return ytd.columns.indexOf(c); });
+  var mIdx = JOIN_KEYS.map(function(c){ return mtd.columns.indexOf(c); });
+
+  // Everything in MTD except the key columns is carried across, renamed on collision.
+  var taken = ytd.columns.slice(), carry = [];
+  mtd.columns.forEach(function(name, i){
+    if (JOIN_KEYS.indexOf(name) !== -1) return;
+    var out = name;
+    if (taken.indexOf(out) !== -1){
+      out = name + MTD_SUFFIX;
+      for (var n = 2; taken.indexOf(out) !== -1; n++) out = name + MTD_SUFFIX + " (" + n + ")";
+    }
+    taken.push(out);
+    carry.push({at: i, name: out, from: name, renamed: out !== name});
+  });
+
+  // Index MTD by key — first row for a key wins, later ones are counted and skipped.
+  var index = new Map(), dupRows = 0, blankKeyRows = 0;
+  for (var r = 0; r < mtd.rows.length; r++){
+    var mk = compositeKey(mtd.rows[r], mIdx);
+    if (mk === null){ blankKeyRows++; continue; }
+    if (index.has(mk)){ dupRows++; continue; }
+    index.set(mk, mtd.rows[r]);
+  }
+
+  var columns = ytd.columns.concat(carry.map(function(c){ return c.name; }));
+  var rows = new Array(ytd.rows.length), matched = 0;
+  for (var i = 0; i < ytd.rows.length; i++){
+    var src = ytd.rows[i];
+    var yk  = compositeKey(src, yIdx);
+    var hit = yk === null ? undefined : index.get(yk);
+    if (hit) matched++;
+    var row = src.slice();
+    for (var c = 0; c < carry.length; c++){
+      var v = hit ? hit[carry[c].at] : null;
+      row.push(v === undefined ? null : v);
+    }
+    rows[i] = row;
+  }
+
+  return {
+    columns: columns, rows: rows, carry: carry,
+    matched: matched, unmatched: ytd.rows.length - matched,
+    dupRows: dupRows, blankKeyRows: blankKeyRows, mtdKeys: index.size
+  };
+}
+
+/* =====================================================================
+   Mapping preparation — mirrors prepare_mapping
+   Groups by (join key, sponsor): sums ownership, keeps first Priority.
+   ===================================================================== */
+function prepareMapping(tbl){
+  var required = [KEY_MAP_CODE, KEY_MAP_NAME, SPONSOR_COL, OWNERSHIP_COL, PRIORITY_COL];
+  var missing = required.filter(function(c){ return tbl.columns.indexOf(c) === -1; });
+  if (missing.length) throw new Error("Mapping sheet missing required columns: " + missing.join(", "));
+
+  var iCode = tbl.columns.indexOf(KEY_MAP_CODE),
+      iName = tbl.columns.indexOf(KEY_MAP_NAME),
+      iSpon = tbl.columns.indexOf(SPONSOR_COL),
+      iOwn  = tbl.columns.indexOf(OWNERSHIP_COL),
+      iPri  = tbl.columns.indexOf(PRIORITY_COL);
+
+  var codeGroups = new Map(), nameGroups = new Map();
+  var badOwnRows = 0;
+
+  function push(groups, key, sponsor, own, pri){
+    var k = key + "\u0001" + (sponsor === null ? "\u0000NA" : sponsor);
+    var g = groups.get(k);
+    if (!g){
+      g = {key:key, sponsor:sponsor, ownership:0, priority:null};
+      groups.set(k, g);
+    }
+    if (!isNaN(own)) g.ownership += own;          // pandas sum() skips NaN
+    if (g.priority === null && pri !== null) g.priority = pri;  // groupby.first()
+  }
+
+  for (var r = 0; r < tbl.rows.length; r++){
+    var row = tbl.rows[r];
+    var jc = normCode(row[iCode]);
+    var jn = normName(row[iName]);
+    var sp = cleanStr(row[iSpon]);
+    var pr = cleanStr(row[iPri]);
+    var ow = normOwnership(row[iOwn]);
+    if (isNaN(ow) && row[iOwn] !== null && row[iOwn] !== undefined && String(row[iOwn]).trim() !== "") badOwnRows++;
+    if (jc !== null) push(codeGroups, jc, sp, ow, pr);
+    if (jn !== null) push(nameGroups, jn, sp, ow, pr);
+  }
+
+  // pandas groupby sorts by key then sponsor (NaN last)
+  function toSorted(groups){
+    var arr = Array.from(groups.values());
+    arr.sort(function(a,b){
+      if (a.key < b.key) return -1;
+      if (a.key > b.key) return 1;
+      if (a.sponsor === null && b.sponsor === null) return 0;
+      if (a.sponsor === null) return 1;
+      if (b.sponsor === null) return -1;
+      if (a.sponsor < b.sponsor) return -1;
+      if (a.sponsor > b.sponsor) return 1;
+      return 0;
+    });
+    var byKey = new Map();
+    for (var i=0;i<arr.length;i++){
+      var e = arr[i];
+      if (!byKey.has(e.key)) byKey.set(e.key, []);
+      byKey.get(e.key).push(e);
+    }
+    return {list:arr, byKey:byKey};
+  }
+
+  return {code: toSorted(codeGroups), name: toSorted(nameGroups), badOwnRows: badOwnRows};
+}
+
+/* =====================================================================
+   Expand + apportion — mirrors expand_and_apportion
+   ===================================================================== */
+async function expandAndApportion(omnia, mapping, measureCols, tolerance){
+  [KEY_OMNIA_NAME, KEY_OMNIA_CODE].forEach(function(c){
+    if (omnia.columns.indexOf(c) === -1) throw new Error("Omnia sheet missing required column: " + c);
+  });
+  var missingMeasures = measureCols.filter(function(c){ return omnia.columns.indexOf(c) === -1; });
+  if (missingMeasures.length) throw new Error("Omnia sheet missing measure column(s): " + missingMeasures.join(", "));
+
+  var iName = omnia.columns.indexOf(KEY_OMNIA_NAME),
+      iCode = omnia.columns.indexOf(KEY_OMNIA_CODE);
+  var isMeasure = new Array(omnia.columns.length).fill(false);
+  measureCols.forEach(function(c){ isMeasure[omnia.columns.indexOf(c)] = true; });
+  // The Python script casts the two key columns with .astype("string"), so they land in the
+  // output as text. Mirrored here so the workbook matches the script cell-for-cell.
+  var isKeyCol = new Array(omnia.columns.length).fill(false);
+  isKeyCol[iName] = true; isKeyCol[iCode] = true;
+
+  var codeByKey = mapping.code.byKey, nameByKey = mapping.name.byKey;
+
+  // Output column layout: Sponsor immediately left of Mastergroup, Priority appended last.
+  var sponsorOut = SPONSOR_OUT_COL, priorityOut = PRIORITY_OUT_COL, clashes = [];
+  if (omnia.columns.indexOf(sponsorOut) !== -1){ sponsorOut = SPONSOR_OUT_COL + " (mapped)"; clashes.push(SPONSOR_OUT_COL); }
+  if (omnia.columns.indexOf(priorityOut) !== -1){ priorityOut = PRIORITY_OUT_COL + " (mapped)"; clashes.push(PRIORITY_OUT_COL); }
+  if (clashes.length) log("Omnia already has column(s) " + clashes.join(", ") + " — mapped values written as \"(mapped)\".", "warn");
+
+  var outCols = omnia.columns.slice();
+  outCols.splice(outCols.indexOf(KEY_OMNIA_NAME), 0, sponsorOut);
+  outCols.push(priorityOut);
+  var sponsorPos = outCols.indexOf(sponsorOut);
+
+  var outRows = [];
+  var missingClients = new Set();
+  var matchedCode = 0, matchedName = 0, unmatched = 0;
+
+  function emit(row, sponsor, ownership, priority){
+    var out = new Array(outCols.length);
+    // copy omnia values, inserting sponsor at its position
+    for (var c = 0, w = 0; c < omnia.columns.length; c++, w++){
+      if (w === sponsorPos) w++;               // leave the sponsor slot
+      var v = row[c];
+      if (isMeasure[c]){
+        var num = coerceMeasure(v);
+        v = isNaN(num) ? null : (isNaN(ownership) ? num : num * ownership);
+      } else if (isKeyCol[c] && v !== null && v !== undefined && !(v instanceof Date)){
+        v = String(v);
+      }
+      out[w] = (v === undefined) ? null : v;
+    }
+    out[sponsorPos] = sponsor === null ? "N/A" : sponsor;
+    out[outCols.length - 1] = priority === null ? "N/A" : priority;
+    outRows.push(out);
+  }
+
+  // Pass 1 — code matches (preferred), preserving Omnia row order
+  for (var r = 0; r < omnia.rows.length; r++){
+    var row = omnia.rows[r];
+    var jc = normCode(row[iCode]);
+    var hits = (jc !== null) ? codeByKey.get(jc) : undefined;
+    if (hits){
+      matchedCode++;
+      for (var h = 0; h < hits.length; h++) emit(row, hits[h].sponsor, hits[h].ownership, hits[h].priority);
+    }
+    if (r % 20000 === 19999) await yieldUI();
+  }
+
+  // Pass 2 — name fallback for rows with no code mapping
+  for (var r2 = 0; r2 < omnia.rows.length; r2++){
+    var row2 = omnia.rows[r2];
+    var jc2 = normCode(row2[iCode]);
+    if (jc2 !== null && codeByKey.has(jc2)) continue;
+    var jn2 = normName(row2[iName]);
+    var hits2 = (jn2 !== null) ? nameByKey.get(jn2) : undefined;
+    if (hits2){
+      matchedName++;
+      for (var h2 = 0; h2 < hits2.length; h2++) emit(row2, hits2[h2].sponsor, hits2[h2].ownership, hits2[h2].priority);
+    } else {
+      unmatched++;
+      emit(row2, null, NaN, null);             // measures left untouched
+      var nm = row2[iName];
+      if (nm !== null && nm !== undefined && String(nm).trim() !== "") missingClients.add(String(nm));
+    }
+    if (r2 % 20000 === 19999) await yieldUI();
+  }
+
+  // Ownership totals per join key (no renormalisation — warn only)
+  function totals(entry, type){
+    var bad = [];
+    entry.byKey.forEach(function(list, key){
+      var t = 0;
+      for (var i=0;i<list.length;i++) t += list[i].ownership;
+      if (Math.abs(t - 1) > tolerance) bad.push({type:type, key:key, total:t});
+    });
+    bad.sort(function(a,b){ return a.total - b.total; });
+    return bad;
+  }
+  var badCode = totals(mapping.code, "Code");
+  var badName = totals(mapping.name, "Name");
+
+  return {
+    columns: outCols,
+    rows: outRows,
+    stats: {
+      rowsBefore: omnia.rows.length,
+      rowsAfter: outRows.length,
+      missingClients: missingClients.size,
+      matchedCode: matchedCode,
+      matchedName: matchedName,
+      unmatched: unmatched
+    },
+    badCode: badCode,
+    badName: badName
+  };
+}
+
+/* =====================================================================
+   Run
+   ===================================================================== */
+var running = false;
+
+async function run(){
+  if (running) return;
+  if (!state.ytd || !state.mtd || !state.map) return;
+  running = true;
+  hideBanner();
+  $("runBtn").disabled = true;
+  $("dlBtn").disabled = true;
+  state.out = null;
+  clearLog();
+  setStatus("Running…", "busy");
+
+  try{
+    var measureCols = $("measures").value.split(",").map(function(s){
+      return s.replace(/\u00a0/g," ").trim();
+    }).filter(Boolean);
+    if (!measureCols.length) throw new Error("Enter at least one measure column.");
+
+    var tolPct = Number($("tolerance").value);
+    if (!isFinite(tolPct) || tolPct < 0) throw new Error("Ownership tolerance must be a number, e.g. 0.5");
+    var tolerance = tolPct / 100;
+
+    log("Run started.", "step");
+    log("Omnia YTD: " + state.ytd.fileName + " [" + state.ytd.sheetName + "] — " + fmt(state.ytd.rows.length) + " rows, " + state.ytd.columns.length + " columns.");
+    log("Omnia MTD: " + state.mtd.fileName + " [" + state.mtd.sheetName + "] — " + fmt(state.mtd.rows.length) + " rows, " + state.mtd.columns.length + " columns.");
+    log("Mapping: " + state.map.fileName + " [" + state.map.sheetName + "] — " + fmt(state.map.rows.length) + " rows.");
+    await yieldUI();
+
+    log("Building the Omnia file — left join on " + JOIN_KEYS.join(" + ") + "…", "step");
+    var j = joinYtdMtd(state.ytd, state.mtd);
+    state.omnia = {
+      fileName:  state.ytd.fileName + " + " + state.mtd.fileName,
+      sheetName: state.ytd.sheetName,
+      columns:   j.columns,
+      rows:      j.rows
+    };
+    log("MTD indexed on " + fmt(j.mtdKeys) + " distinct key(s).");
+    if (j.dupRows)      log(fmt(j.dupRows) + " MTD row(s) repeated a key already seen — first match used.", "warn");
+    if (j.blankKeyRows) log(fmt(j.blankKeyRows) + " MTD row(s) had a blank key part and can never match — ignored.", "warn");
+    log("Joined: " + fmt(j.matched) + " of " + fmt(state.ytd.rows.length) + " YTD row(s) matched MTD, " +
+        fmt(j.unmatched) + " left blank.", j.unmatched ? "warn" : "ok");
+    var renamed = j.carry.filter(function(c){ return c.renamed; });
+    log("Carried " + j.carry.length + " MTD column(s) across" +
+        (renamed.length ? ", " + renamed.length + " renamed: " + renamed.map(function(c){ return c.name; }).join(" | ") : "") + ".");
+    log("Omnia file built: " + fmt(j.rows.length) + " rows, " + j.columns.length + " columns.", "ok");
+    await yieldUI();
+
+    // A measure listed by the user is apportioned alongside its MTD twin, when the join produced one.
+    var twins = [];
+    measureCols.slice().forEach(function(c){
+      var t = c + MTD_SUFFIX;
+      if (state.omnia.columns.indexOf(t) !== -1 && measureCols.indexOf(t) === -1){
+        measureCols.push(t); twins.push(t);
+      }
+    });
+    log("Measures: " + measureCols.join(" | "));
+    if (twins.length) log("Included " + twins.length + " MTD twin column(s) automatically: " + twins.join(" | ") + ".");
+    await yieldUI();
+
+    log("Preparing sponsor mapping…", "step");
+    var mapping = prepareMapping(state.map);
+    log("Aggregated to " + fmt(mapping.code.list.length) + " code/sponsor pairs and " + fmt(mapping.name.list.length) + " name/sponsor pairs.");
+    if (mapping.badOwnRows) log(mapping.badOwnRows + " mapping row(s) had an unreadable ownership value — treated as blank.", "warn");
+    await yieldUI();
+
+    log("Matching Omnia rows and apportioning measures…", "step");
+    var result = await expandAndApportion(state.omnia, mapping, measureCols, tolerance);
+
+    var s = result.stats;
+    log("Matched on code: " + fmt(s.matchedCode) + " rows · matched on name: " + fmt(s.matchedName) + " rows · unmatched: " + fmt(s.unmatched) + " rows.");
+    log("Rows before: " + fmt(s.rowsBefore) + "  →  rows after: " + fmt(s.rowsAfter) + ".");
+    log("Clients missing mapping: " + fmt(s.missingClients) + ".", s.missingClients ? "warn" : "ok");
+
+    var badTotal = result.badCode.length + result.badName.length;
+    log("Clients with ownership totals not ~100%: " + fmt(badTotal) + ".", badTotal ? "warn" : "ok");
+    result.badCode.slice(0, 50).forEach(function(b){
+      log("  ownership " + (b.total*100).toFixed(2) + "% — code " + b.key, "warn");
+    });
+    result.badName.slice(0, 50).forEach(function(b){
+      log("  ownership " + (b.total*100).toFixed(2) + "% — name " + b.key, "warn");
+    });
+
+    // stats + warnings panel
+    $("sRowsBefore").textContent = fmt(s.rowsBefore);
+    $("sRowsAfter").textContent  = fmt(s.rowsAfter);
+    $("sMissing").textContent    = fmt(s.missingClients);
+    $("sBad").textContent        = fmt(badTotal);
+    $("statMissing").className   = "stat" + (s.missingClients ? " flag" : "");
+    $("statBad").className       = "stat" + (badTotal ? " flag" : "");
+    $("chipTotal").textContent   = "Total warnings: " + badTotal;
+    $("chipTotal").className     = "chip" + (badTotal ? " hot" : "");
+    $("chipCode").textContent    = "Code: " + result.badCode.length;
+    $("chipName").textContent    = "Name: " + result.badName.length;
+    renderWarnings(result.badCode, result.badName);
+
+    // output
+    state.out = {
+      columns: result.columns,
+      rows: result.rows,
+      sheetName: ($("sheetName").value.trim() || "Omnia_Apportioned").slice(0, 31),
+      fileName: fileNameWithExt($("outName").value.trim() || "Omnia_Mapped.xlsx")
+    };
+
+    $("dlBtn").disabled = false;
+    refreshEmbed();
+    log("Done. Output ready: " + fmt(result.rows.length) + " rows × " + result.columns.length + " columns.", "ok");
+    banner("Apportioning finished. " + fmt(result.rows.length) + " rows ready to download as " + state.out.fileName + ".", "ok");
+    setStatus("Run complete", "done");
+  }catch(err){
+    log(String(err && err.message ? err.message : err), "err");
+    banner(String(err && err.message ? err.message : err), "err");
+    setStatus("Run failed", "bad");
+  }finally{
+    running = false;
+    $("runBtn").disabled = !(state.ytd && state.mtd && state.map);
+  }
+}
+
+function fileNameWithExt(n){
+  return /\.xlsx$/i.test(n) ? n : n.replace(/\.[^.]*$/, "") + ".xlsx";
+}
+
+/* =====================================================================
+   Warnings table
+   ===================================================================== */
+function renderWarnings(badCode, badName){
+  var tbody = $("warnTable").querySelector("tbody");
+  tbody.innerHTML = "";
+  var rows = badCode.concat(badName).slice(0, 50);
+  if (!rows.length){
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">All mapped clients total 100% within tolerance.</td></tr>';
+    return;
+  }
+  var frag = document.createDocumentFragment();
+  rows.forEach(function(b){
+    var tr = document.createElement("tr");
+    var td1 = document.createElement("td");
+    var tag = document.createElement("span");
+    tag.className = "tag " + b.type.toLowerCase();
+    tag.textContent = b.type;
+    td1.appendChild(tag);
+    var td2 = document.createElement("td");
+    td2.className = "key"; td2.textContent = b.key; td2.title = b.key;
+    var td3 = document.createElement("td");
+    td3.className = "num"; td3.textContent = (b.total * 100).toFixed(2) + "%";
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
+}
+
+/* =====================================================================
+   Download — mirrors save_output (splits sheets past the Excel row limit)
+   ===================================================================== */
+function download(){
+  if (!state.out) return;
+  var btn = $("dlBtn"), label = btnLabel("dlBtn", "Building workbook…");
+  btn.disabled = true;
+
+  setTimeout(function(){
+    try{
+      var perSheet = EXCEL_MAX_ROWS - 1;
+
+      var wb = XLSX.utils.book_new();
+      var rows = state.out.rows, n = rows.length;
+      var numSheets = n === 0 ? 1 : Math.ceil(n / perSheet);
+
+      for (var i = 0; i < numSheets; i++){
+        var start = i * perSheet;
+        var end = Math.min((i + 1) * perSheet, n);
+        var aoa = [state.out.columns].concat(rows.slice(start, end));
+        var ws = XLSX.utils.aoa_to_sheet(aoa, {cellDates:true, dense:true});
+        var name = (i === 0 ? state.out.sheetName : state.out.sheetName + "_" + (i+1)).slice(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, name);
+      }
+
+      XLSX.writeFile(wb, state.out.fileName, {bookType:"xlsx", cellDates:true, compression:true});
+      log("Saved: " + state.out.fileName + " (" + numSheets + " sheet" + (numSheets>1?"s":"") + ", first sheet: " + state.out.sheetName + ")", "ok");
+    }catch(err){
+      log("Download failed: " + (err && err.message ? err.message : err), "err");
+      banner("Download failed: " + (err && err.message ? err.message : err), "err");
+    }finally{
+      btnLabel("dlBtn", label); btn.disabled = false;
+    }
+  }, 30);
+}
+
+/* =====================================================================
+   File wiring
+   ===================================================================== */
+function wireFile(kind, opts){
+  var input = $(opts.input), drop = $(opts.drop), nameEl = $(opts.name),
+      btn = $(opts.btn), sel = $(opts.sheet), selWrap = $(opts.sheetWrap);
+
+  btn.addEventListener("click", function(){ input.click(); });
+  input.addEventListener("change", function(){ if (input.files[0]) load(input.files[0]); });
+
+  ["dragenter","dragover"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add("dragover"); });
+  });
+  ["dragleave","drop"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove("dragover"); });
+  });
+  drop.addEventListener("drop", function(e){
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) load(f);
+  });
+
+  sel.addEventListener("change", function(){ pickSheet(sel.value); });
+
+  function load(file){
+    nameEl.textContent = "Reading " + file.name + "…";
+    nameEl.className = "file-name";
+    drop.className = "drop";
+    readWorkbook(file).then(function(wb){
+      state[kind] = {fileName:file.name, wb:wb, sheetNames:wb.SheetNames, sheetName:null, columns:[], rows:[]};
+      sel.innerHTML = "";
+      wb.SheetNames.forEach(function(s){
+        var o = document.createElement("option"); o.value = s; o.textContent = s; sel.appendChild(o);
+      });
+      selWrap.className = "sheet-pick" + (wb.SheetNames.length > 1 ? " show" : "");
+      pickSheet(wb.SheetNames[0]);
+    }).catch(function(err){
+      state[kind] = null;
+      drop.className = "drop bad";
+      nameEl.textContent = "Couldn't read this file";
+      log(opts.label + ": " + (err && err.message ? err.message : err), "err");
+      refresh();
+    });
+  }
+
+  function pickSheet(sheetName){
+    var st = state[kind];
+    if (!st) return;
+    try{
+      var tbl = sheetToTable(st.wb, sheetName);
+      st.sheetName = sheetName; st.columns = tbl.columns; st.rows = tbl.rows;
+      sel.value = sheetName;
+      drop.className = "drop loaded";
+      nameEl.className = "file-name set";
+      nameEl.textContent = st.fileName + " — " + fmt(tbl.rows.length) + " rows";
+      log(opts.label + " loaded: " + st.fileName + " [" + sheetName + "] — " + fmt(tbl.rows.length) + " rows, " + tbl.columns.length + " columns.");
+
+      var need = opts.required.filter(function(c){ return tbl.columns.indexOf(c) === -1; });
+      if (need.length) log(opts.label + " is missing: " + need.join(", "), "warn");
+    }catch(err){
+      log(opts.label + ": " + (err && err.message ? err.message : err), "err");
+    }
+    refresh();
+  }
+}
+
+function refresh(){
+  var ready = !!(state.ytd && state.mtd && state.map);
+  $("runBtn").disabled = !ready || running;
+  if (ready) hideBanner();
+  refreshEmbed();
+}
+
+function resetAll(){
+  state = {ytd:null, mtd:null, map:null, omnia:null, out:null, tpl:null};
+  ["ytdInput","mtdInput","mapInput","tplInput"].forEach(function(id){ $(id).value = ""; });
+  $("tplDrop").className = "drop";
+  $("tplName").className = "file-name";
+  $("tplName").textContent = "No file chosen";
+  $("sJsonSize").textContent = "—"; $("sB64Size").textContent = "—";
+  [["ytdDrop","ytdName","ytdSheetWrap"],["mtdDrop","mtdName","mtdSheetWrap"],["mapDrop","mapName","mapSheetWrap"]].forEach(function(t){
+    $(t[0]).className = "drop";
+    $(t[1]).className = "file-name";
+    $(t[1]).textContent = "No file chosen";
+    $(t[2]).className = "sheet-pick";
+  });
+  ["sRowsBefore","sRowsAfter","sMissing","sBad"].forEach(function(id){ $(id).textContent = "—"; });
+  $("statMissing").className = "stat"; $("statBad").className = "stat";
+  $("chipTotal").textContent = "Total warnings: —"; $("chipTotal").className = "chip";
+  $("chipCode").textContent = "Code: —"; $("chipName").textContent = "Name: —";
+  $("warnTable").querySelector("tbody").innerHTML = '<tr><td colspan="3" class="empty">No data yet. Run apportioning to see results.</td></tr>';
+  $("dlBtn").disabled = true;
+  setStatus("System ready");
+  hideBanner();
+  clearLog();
+  log("Ready. Upload the Omnia YTD, Omnia MTD and sponsor mapping files to enable Run.");
+  refresh();
+}
+
+/* =====================================================================
+   Embed into dashboard HTML
+   The output JSON is gzipped, Base64'd, and written into the uploaded file
+   as OMNIA_COL_JSON_GZ_B64 — replacing an existing constant if there is
+   one, otherwise inserted just above the OMNIA_COL_JSON declaration.
+   ===================================================================== */
+var RE_GZ_CONST = /(?:const|let|var)\s+OMNIA_COL_JSON_GZ_B64\s*=\s*(?:"[^"]*"|'[^']*'|`[^`]*`)\s*;?/;
+var RE_ANCHOR   = /^([ \t]*)(?:const|let|var)\s+OMNIA_COL_JSON(?!_)\s*=/m;
+
+/* Columnar: one key per output column, each holding that column's values down
+   the rows. Every array is rows.length long, so index i is row i throughout. */
+function buildOutputJson(){
+  var cols = state.out.columns, rows = state.out.rows, n = rows.length;
+  var obj = {};
+  for (var c = 0; c < cols.length; c++){
+    var col = new Array(n);
+    for (var i = 0; i < n; i++){
+      var v = rows[i][c];
+      col[i] = v === undefined ? null : v;
+    }
+    obj[cols[c]] = col;
+  }
+  if (Object.keys(obj).length !== cols.length){
+    log("Embed: duplicate column names collapsed — " + cols.length + " columns produced " +
+        Object.keys(obj).length + " keys.", "warn");
+  }
+  return JSON.stringify(obj);
+}
+
+function gzipBytes(u8){
+  if (typeof CompressionStream === "undefined"){
+    return Promise.reject(new Error("This browser has no CompressionStream, so gzip is unavailable. Use a recent Chrome or Edge."));
+  }
+  var stream = new Blob([u8]).stream().pipeThrough(new CompressionStream("gzip"));
+  return new Response(stream).arrayBuffer().then(function(ab){ return new Uint8Array(ab); });
+}
+
+function bytesToB64(u8){
+  var CHUNK = 0x8000, parts = [];
+  for (var i = 0; i < u8.length; i += CHUNK){
+    parts.push(String.fromCharCode.apply(null, u8.subarray(i, i + CHUNK)));
+  }
+  return btoa(parts.join(""));
+}
+
+function patchHtml(html, b64){
+  var line = 'const OMNIA_COL_JSON_GZ_B64="' + b64 + '";';
+  if (RE_GZ_CONST.test(html)){
+    return {text: html.replace(RE_GZ_CONST, function(){ return line; }), mode: "replaced"};
+  }
+  var m = RE_ANCHOR.exec(html);
+  if (!m){
+    throw new Error("Found neither OMNIA_COL_JSON_GZ_B64 nor OMNIA_COL_JSON in this file — nothing to replace or anchor to.");
+  }
+  var indent = m[1];
+  return {
+    text: html.slice(0, m.index) + indent + line + "\n" + html.slice(m.index),
+    mode: "inserted"
+  };
+}
+
+function saveText(text, fileName){
+  var url = URL.createObjectURL(new Blob([text], {type:"text/html;charset=utf-8"}));
+  var a = document.createElement("a");
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+}
+
+function kb(n){
+  if (n < 1024) return n + " B";
+  if (n < 1024*1024) return (n/1024).toFixed(1) + " KB";
+  return (n/(1024*1024)).toFixed(2) + " MB";
+}
+
+function embed(){
+  if (!state.out || !state.tpl) return;
+  var btn = $("embedBtn"), label = btnLabel("embedBtn", "Compressing…");
+  btn.disabled = true;
+
+  Promise.resolve().then(function(){
+    var json = buildOutputJson();
+    var raw  = new TextEncoder().encode(json);
+    log("Embed: " + fmt(state.out.rows.length) + " rows × " + state.out.columns.length +
+        " columns as columnar JSON — " + kb(raw.length) + " uncompressed.");
+    return gzipBytes(raw).then(function(gz){
+      var b64 = bytesToB64(gz);
+      var res = patchHtml(state.tpl.text, b64);
+      saveText(res.text, state.tpl.fileName);
+
+      $("sJsonSize").textContent = kb(raw.length);
+      $("sB64Size").textContent  = kb(b64.length);
+      $("embedNote").textContent = "OMNIA_COL_JSON_GZ_B64 " + res.mode + " — gzip " + kb(gz.length) +
+        " (" + (100 - gz.length / raw.length * 100).toFixed(1) + "% smaller), Base64 " + kb(b64.length) + ".";
+      log("Embed: constant " + res.mode + " in " + state.tpl.fileName + " — gzip " + kb(gz.length) +
+          ", Base64 " + kb(b64.length) + ". Saved.", "ok");
+      banner("Dashboard written: " + state.tpl.fileName + " (constant " + res.mode + ").", "ok");
+    });
+  }).catch(function(err){
+    var msg = err && err.message ? err.message : String(err);
+    log("Embed failed: " + msg, "err");
+    banner("Embed failed: " + msg, "err");
+  }).then(function(){
+    btnLabel("embedBtn", label);
+    refreshEmbed();
+  });
+}
+
+function wireTemplate(){
+  var input = $("tplInput"), drop = $("tplDrop"), nameEl = $("tplName"), btn = $("tplBtn");
+
+  btn.addEventListener("click", function(){ input.click(); });
+  input.addEventListener("change", function(){ if (input.files[0]) load(input.files[0]); });
+
+  ["dragenter","dragover"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add("dragover"); });
+  });
+  ["dragleave","drop"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove("dragover"); });
+  });
+  drop.addEventListener("drop", function(e){
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) load(f);
+  });
+
+  function load(file){
+    nameEl.textContent = "Reading " + file.name + "…";
+    nameEl.className = "file-name";
+    drop.className = "drop";
+    file.text().then(function(text){
+      state.tpl = {fileName: file.name, text: text};
+      var has = RE_GZ_CONST.test(text), anchored = RE_ANCHOR.test(text);
+      if (!has && !anchored){
+        state.tpl = null;
+        drop.className = "drop bad";
+        nameEl.textContent = "No OMNIA_COL_JSON constant in this file";
+        log("Dashboard file: neither OMNIA_COL_JSON_GZ_B64 nor OMNIA_COL_JSON found in " + file.name + ".", "err");
+      } else {
+        drop.className = "drop loaded";
+        nameEl.className = "file-name set";
+        nameEl.textContent = file.name + " — " + kb(text.length);
+        log("Dashboard file loaded: " + file.name + " — " + kb(text.length) + ", " +
+            (has ? "existing OMNIA_COL_JSON_GZ_B64 will be replaced." : "constant will be inserted above OMNIA_COL_JSON."));
+      }
+      refreshEmbed();
+    }).catch(function(err){
+      state.tpl = null;
+      drop.className = "drop bad";
+      nameEl.textContent = "Couldn't read this file";
+      log("Dashboard file: " + (err && err.message ? err.message : err), "err");
+      refreshEmbed();
+    });
+  }
+}
+
+function refreshEmbed(){
+  $("embedBtn").disabled = !(state.out && state.tpl);
+  if (!state.tpl)      $("embedNote").textContent = "No dashboard file loaded yet.";
+  else if (!state.out) $("embedNote").textContent = "Run apportioning to produce the output to embed.";
+}
+
+/* =====================================================================
+   Init
+   ===================================================================== */
+wireFile("ytd", {
+  input:"ytdInput", drop:"ytdDrop", name:"ytdName", btn:"ytdBtn",
+  sheet:"ytdSheet", sheetWrap:"ytdSheetWrap", label:"Omnia YTD file",
+  required:JOIN_KEYS
+});
+wireFile("mtd", {
+  input:"mtdInput", drop:"mtdDrop", name:"mtdName", btn:"mtdBtn",
+  sheet:"mtdSheet", sheetWrap:"mtdSheetWrap", label:"Omnia MTD file",
+  required:JOIN_KEYS
+});
+wireFile("map", {
+  input:"mapInput", drop:"mapDrop", name:"mapName", btn:"mapBtn",
+  sheet:"mapSheet", sheetWrap:"mapSheetWrap", label:"Sponsor mapping file",
+  required:[KEY_MAP_CODE, KEY_MAP_NAME, SPONSOR_COL, OWNERSHIP_COL, PRIORITY_COL]
+});
+
+wireTemplate();
+
+$("runBtn").addEventListener("click", run);
+$("dlBtn").addEventListener("click", download);
+$("resetBtn").addEventListener("click", resetAll);
+$("embedBtn").addEventListener("click", embed);
+refreshEmbed();
+
+log("Ready. Upload the Omnia YTD, Omnia MTD and sponsor mapping files to enable Run.");
+})();
+</script>
+</body>
+</html>

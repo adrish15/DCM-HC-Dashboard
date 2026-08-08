@@ -1288,6 +1288,43 @@
       font-size: 12px;
       font-weight: 700;
     }
+
+    /* Series legend rendered as DOM rather than on the canvas, so the swatches
+       and the year pills share one row (see renderGroupedYearStackChart).
+       Chart.js can only draw its own legend inside the canvas, which is what
+       forced the years onto a second row underneath. */
+    .cl-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 6px;
+      border: 0;
+      border-radius: 6px;
+      background: none;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--slate-700);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .cl-item:hover { background-color: var(--slate-100); }
+    .cl-item.is-hidden { color: var(--slate-400); text-decoration: line-through; }
+    .cl-item.is-hidden .cl-swatch { opacity: 0.3; }
+    .cl-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    /* Keeps the year pills legible as a separate group from the series swatches
+       now that both sit on the same row. */
+    .cl-sep {
+      width: 1px;
+      height: 14px;
+      margin: 0 4px;
+      background-color: var(--border);
+    }
     .chart-subsection {
       margin-top: 20px;
       padding-top: 18px;
@@ -4276,11 +4313,13 @@
       });
 
       const legendEl = document.getElementById(legendId);
-      if(legendEl) {
-        legendEl.innerHTML = years.length
-          ? years.map((y, i) => `<span class="year-badge" style="background:${yearBadgeColor(i).bg};color:${yearBadgeColor(i).text}">${escapeHtml(y)}</span>`).join("")
-          : "";
-      }
+      const yearsHtml = years
+        .map((y, i) => `<span class="year-badge" style="background:${yearBadgeColor(i).bg};color:${yearBadgeColor(i).text}">${escapeHtml(y)}</span>`)
+        .join("");
+      // The doughnut fallback below keeps its own legend on the canvas, so it
+      // only needs the year pills here. The bar path replaces this with the
+      // combined row once the chart exists (see renderStackLegendRow).
+      if(legendEl) legendEl.innerHTML = yearsHtml;
 
       // One group and one year leaves a single stack — the year-dot row and
       // per-stack totals have nothing left to disambiguate, so show that stack
@@ -4307,35 +4346,9 @@
           ...baseLinearOpts(),
           layout: {padding:{top:22}},
           plugins: {
-            legend: {
-              display:true,
-              position:"bottom",
-              labels: {
-                font: { family: "'Inter', sans-serif", size: 11 }, boxWidth: 12, usePointStyle: true,
-                // Collapse the per-year duplicate datasets down to one legend
-                // entry per stack value, since every year contributes its own
-                // dataset for the same value/colour.
-                generateLabels: (chart) => {
-                  const seen = new Set();
-                  const out = [];
-                  chart.data.datasets.forEach((ds, i) => {
-                    if(seen.has(ds.label)) return;
-                    seen.add(ds.label);
-                    out.push({ text: ds.label, fillStyle: ds.backgroundColor, strokeStyle: ds.backgroundColor, fontColor: HSBC_CHART_COLORS.grey8, datasetIndex: i });
-                  });
-                  return out;
-                }
-              },
-              onClick: (e, legendItem, legend) => {
-                const chart = legend.chart;
-                chart.data.datasets.forEach((ds, i) => {
-                  if(ds.label !== legendItem.text) return;
-                  const meta = chart.getDatasetMeta(i);
-                  meta.hidden = meta.hidden === null ? !ds.hidden : null;
-                });
-                chart.update();
-              }
-            },
+            // Drawn as DOM by renderStackLegendRow instead, so that it can share
+            // a row with the year pills.
+            legend: { display:false },
             datalabels: { display:false},
             stackTotalLabels: { display: false },
             gcbStackTotalLabels: {
@@ -4363,6 +4376,39 @@
             }
           }
         }
+      });
+
+      renderStackLegendRow(legendEl, canvasId, stacks, stackField, yearsHtml);
+    }
+
+    // One legend row holding the series swatches and then the year pills. Every
+    // year contributes its own dataset for the same value/colour, so the stacks
+    // list is already the deduplicated set the canvas legend used to build with
+    // generateLabels, and a click has to toggle all of a value's datasets at
+    // once — matching what the built-in legend's onClick did.
+    function renderStackLegendRow(legendEl, canvasId, stacks, stackField, yearsHtml){
+      if(!legendEl) return;
+      const seriesHtml = stacks.map(st =>
+        `<button type="button" class="cl-item" data-series="${escapeHtml(st)}">` +
+        `<span class="cl-swatch" style="background:${categoryColor(stackField, st)}"></span>${escapeHtml(st)}</button>`
+      ).join("");
+      legendEl.innerHTML = seriesHtml + (seriesHtml && yearsHtml ? `<span class="cl-sep"></span>` : "") + yearsHtml;
+
+      legendEl.querySelectorAll(".cl-item").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const chart = state.charts[canvasId];
+          if(!chart) return;
+          const label = btn.dataset.series;
+          let hidden = false;
+          chart.data.datasets.forEach((ds, i) => {
+            if(ds.label !== label) return;
+            const meta = chart.getDatasetMeta(i);
+            meta.hidden = meta.hidden === null ? true : null;
+            hidden = !!meta.hidden;
+          });
+          btn.classList.toggle("is-hidden", hidden);
+          chart.update();
+        });
       });
     }
 
@@ -5034,23 +5080,84 @@
         titleText = clone.textContent.trim() || chartId;
       }
 
-      // A chart-specific subtitle (currently only GCB Distribution's
-      // "Each set of N bars per GCB represents: <year badges>" row) lives as
-      // plain DOM next to the canvas, so it isn't part of srcCanvas's pixels
-      // and has to be redrawn onto the exported image by hand.
+      // The subtitle strip next to the canvas is plain DOM, so it isn't part of
+      // srcCanvas's pixels and has to be redrawn by hand. On the GCB charts it
+      // now carries the whole legend — series swatches then year pills — since
+      // those are rendered as DOM rather than drawn by Chart.js. Walk the child
+      // nodes so each part is redrawn in the order it appears on screen.
       const subtitleEl = card ? card.querySelector(".chart-subtitle") : null;
-      const subtitleFullText = subtitleEl ? subtitleEl.textContent.replace(/\s+/g, " ").trim() : "";
-      const hasSubtitle = subtitleFullText.length > 0;
-      const badgeEls = subtitleEl ? [...subtitleEl.querySelectorAll(".year-badge")] : [];
-      let subtitleLeadText = subtitleFullText;
-      badgeEls.forEach(b => { subtitleLeadText = subtitleLeadText.replace(b.textContent.trim(), "").trim(); });
+      const subtitleTokens = [];
+      if(subtitleEl){
+        subtitleEl.childNodes.forEach(node => {
+          const text = node.textContent.replace(/\s+/g, " ").trim();
+          if(node.nodeType === Node.TEXT_NODE){
+            if(text) subtitleTokens.push({ kind: "text", text });
+            return;
+          }
+          if(node.nodeType !== Node.ELEMENT_NODE) return;
+          if(node.classList.contains("year-badge")){
+            subtitleTokens.push({
+              kind: "pill", text,
+              bg: node.style.backgroundColor || "#e2e8f0",
+              fg: node.style.color || HSBC_CHART_COLORS.black
+            });
+          } else if(node.classList.contains("cl-item")){
+            const sw = node.querySelector(".cl-swatch");
+            subtitleTokens.push({
+              kind: "swatch", text,
+              color: (sw && sw.style.backgroundColor) || HSBC_CHART_COLORS.grey7,
+              dimmed: node.classList.contains("is-hidden")
+            });
+          } else if(node.classList.contains("cl-sep")){
+            subtitleTokens.push({ kind: "sep" });
+          } else if(text){
+            subtitleTokens.push({ kind: "text", text });
+          }
+        });
+      }
 
       const ratio = window.devicePixelRatio || 1;
       const padding = Math.round(22 * ratio);
       const titleFontPx = Math.round(18 * ratio);
       const titleBarHeight = Math.round(titleFontPx + padding * 1.8);
       const subtitleFontPx = Math.round(13 * ratio);
-      const subtitleBarHeight = hasSubtitle ? Math.round(subtitleFontPx + padding * 1.3) : 0;
+
+      const badgePadX = Math.round(10 * ratio);
+      const itemGap = Math.round(10 * ratio);
+      const swatchSize = Math.round(subtitleFontPx * 0.72);
+      const swatchGap = Math.round(6 * ratio);
+      const sepWidth = Math.round(13 * ratio);
+      const subRowHeight = Math.round(subtitleFontPx * 1.9);
+      const subRowGap = Math.round(6 * ratio);
+
+      // A legend with many series is wider than the image, so wrap it into as
+      // many rows as it needs and let the strip grow to fit them. Measuring on a
+      // scratch context because the output canvas can't be sized until the row
+      // count — and therefore the strip height — is known.
+      const measureCtx = document.createElement("canvas").getContext("2d");
+      const subtitleRows = [];
+      let subRow = [];
+      let subRowWidth = 0;
+      subtitleTokens.forEach(tok => {
+        measureCtx.font = `${tok.kind === "pill" ? 700 : 500} ${subtitleFontPx}px 'Inter', sans-serif`;
+        const textWidth = tok.text ? measureCtx.measureText(tok.text).width : 0;
+        tok.width = tok.kind === "pill" ? Math.round(textWidth + badgePadX * 2)
+          : tok.kind === "swatch" ? Math.round(textWidth + swatchSize + swatchGap)
+          : tok.kind === "sep" ? sepWidth
+          : Math.round(textWidth);
+        if(subRow.length && subRowWidth + itemGap + tok.width > srcCanvas.width){
+          subtitleRows.push(subRow);
+          subRow = [];
+          subRowWidth = 0;
+        }
+        subRowWidth += tok.width + (subRow.length ? itemGap : 0);
+        subRow.push(tok);
+      });
+      if(subRow.length) subtitleRows.push(subRow);
+
+      const subtitleBarHeight = subtitleRows.length
+        ? Math.round(subtitleRows.length * subRowHeight + (subtitleRows.length - 1) * subRowGap + padding * 0.9)
+        : 0;
       const chartOffsetY = titleBarHeight + subtitleBarHeight;
 
       const out = document.createElement("canvas");
@@ -5077,47 +5184,65 @@
       ctx.lineTo(padding + Math.round(40 * ratio), ruleY);
       ctx.stroke();
 
-      // Subtitle row: leading label text, then one rounded pill per year badge
-      if (hasSubtitle) {
-        const subBaseline = titleBarHeight + Math.round(subtitleBarHeight / 2 + subtitleFontPx * 0.35);
-        let cursorX = padding;
-        ctx.textBaseline = "alphabetic";
-        if (subtitleLeadText) {
-          ctx.fillStyle = HSBC_CHART_COLORS.grey7;
-          ctx.font = `500 ${subtitleFontPx}px 'Inter', sans-serif`;
-          ctx.fillText(subtitleLeadText, cursorX, subBaseline);
-          cursorX += ctx.measureText(subtitleLeadText).width + Math.round(8 * ratio);
-        }
-        const badgePadX = Math.round(10 * ratio);
-        const badgeGap = Math.round(6 * ratio);
-        const badgeHeight = Math.round(subtitleFontPx * 1.9);
-        const badgeY = titleBarHeight + Math.round((subtitleBarHeight - badgeHeight) / 2);
-        ctx.font = `700 ${subtitleFontPx}px 'Inter', sans-serif`;
-        badgeEls.forEach(badge => {
-          const text = badge.textContent.trim();
-          const pillWidth = Math.round(ctx.measureText(text).width + badgePadX * 2);
-          const radius = badgeHeight / 2;
-          ctx.fillStyle = badge.style.backgroundColor || "#e2e8f0";
-          ctx.beginPath();
-          if (ctx.roundRect) {
-            ctx.roundRect(cursorX, badgeY, pillWidth, badgeHeight, radius);
-          } else {
-            ctx.moveTo(cursorX + radius, badgeY);
-            ctx.arcTo(cursorX + pillWidth, badgeY, cursorX + pillWidth, badgeY + badgeHeight, radius);
-            ctx.arcTo(cursorX + pillWidth, badgeY + badgeHeight, cursorX, badgeY + badgeHeight, radius);
-            ctx.arcTo(cursorX, badgeY + badgeHeight, cursorX, badgeY, radius);
-            ctx.arcTo(cursorX, badgeY, cursorX + pillWidth, badgeY, radius);
-          }
-          ctx.fill();
-          ctx.fillStyle = badge.style.color || HSBC_CHART_COLORS.black;
-          ctx.textBaseline = "middle";
-          ctx.fillText(text, cursorX + badgePadX, badgeY + badgeHeight / 2 + Math.round(ratio));
-          ctx.textBaseline = "alphabetic";
-          cursorX += pillWidth + badgeGap;
+      // Legend strip: series swatches, then the year pills, wrapped over as many
+      // rows as the layout pass above worked out.
+      if (subtitleRows.length) {
+        let rowY = titleBarHeight + Math.round(padding * 0.35);
+        ctx.textBaseline = "middle";
+        subtitleRows.forEach(row => {
+          let cursorX = padding;
+          const midY = rowY + subRowHeight / 2;
+          row.forEach(tok => {
+            if (tok.kind === "pill") {
+              const radius = subRowHeight / 2;
+              ctx.fillStyle = tok.bg;
+              ctx.beginPath();
+              if (ctx.roundRect) {
+                ctx.roundRect(cursorX, rowY, tok.width, subRowHeight, radius);
+              } else {
+                ctx.moveTo(cursorX + radius, rowY);
+                ctx.arcTo(cursorX + tok.width, rowY, cursorX + tok.width, rowY + subRowHeight, radius);
+                ctx.arcTo(cursorX + tok.width, rowY + subRowHeight, cursorX, rowY + subRowHeight, radius);
+                ctx.arcTo(cursorX, rowY + subRowHeight, cursorX, rowY, radius);
+                ctx.arcTo(cursorX, rowY, cursorX + tok.width, rowY, radius);
+              }
+              ctx.fill();
+              ctx.font = `700 ${subtitleFontPx}px 'Inter', sans-serif`;
+              ctx.fillStyle = tok.fg;
+              ctx.fillText(tok.text, cursorX + badgePadX, midY + Math.round(ratio));
+            } else if (tok.kind === "swatch") {
+              // Series the user toggled off stay in the legend, dimmed, exactly
+              // as they read on screen.
+              ctx.globalAlpha = tok.dimmed ? 0.35 : 1;
+              ctx.fillStyle = tok.color;
+              ctx.beginPath();
+              ctx.arc(cursorX + swatchSize / 2, midY, swatchSize / 2, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.font = `500 ${subtitleFontPx}px 'Inter', sans-serif`;
+              ctx.fillStyle = HSBC_CHART_COLORS.grey8;
+              ctx.fillText(tok.text, cursorX + swatchSize + swatchGap, midY + Math.round(ratio));
+              ctx.globalAlpha = 1;
+            } else if (tok.kind === "sep") {
+              ctx.strokeStyle = "#e2e8f0";
+              ctx.lineWidth = Math.max(1, Math.round(ratio));
+              ctx.beginPath();
+              ctx.moveTo(cursorX + sepWidth / 2, midY - subRowHeight * 0.3);
+              ctx.lineTo(cursorX + sepWidth / 2, midY + subRowHeight * 0.3);
+              ctx.stroke();
+            } else {
+              ctx.font = `500 ${subtitleFontPx}px 'Inter', sans-serif`;
+              ctx.fillStyle = HSBC_CHART_COLORS.grey7;
+              ctx.fillText(tok.text, cursorX, midY + Math.round(ratio));
+            }
+            cursorX += tok.width + itemGap;
+          });
+          rowY += subRowHeight + subRowGap;
         });
+        ctx.textBaseline = "alphabetic";
       }
 
-      // Chart image (bars, stacks, and its own legend baked into the canvas)
+      // Chart image (bars and stacks, plus the canvas legend on the charts that
+      // still draw one — the GCB charts' legend came through the strip above)
       ctx.drawImage(srcCanvas, padding, chartOffsetY);
 
       const safeName = titleText.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || chartId;

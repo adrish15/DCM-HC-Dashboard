@@ -1747,17 +1747,24 @@
               <div class="filter-ym-panel" id="f_gcb_panel"></div>
             </div>
           </div>
-          <!-- FO/Non-FO is visible in both states, so it carries no admin-field
-               class. It is last in the DOM deliberately: with the block above
-               hidden it renders directly under Movement Type 2 as a locked,
-               read-only pin, and once the block is shown it falls into place
-               at the foot of the admin section, where it becomes editable
-               (see isFieldLocked). -->
+          <!-- FO/Non-FO and Is Temp Emp are visible in both states, so they
+               carry no admin-field class. They are last in the DOM
+               deliberately: with the block above hidden they render directly
+               under Movement Type 2 as locked, read-only pins, and once the
+               block is shown they fall into place at the foot of the admin
+               section, where they become editable (see isFieldLocked). -->
           <div class="field field-locked">
             <label>FO/Non-FO</label>
             <div class="filter-ym-wrap">
               <button type="button" class="filter-ym-btn" id="f_fo_btn" disabled aria-disabled="true" title="Fixed scope — this dashboard reports on Front Office staff">All</button>
               <div class="filter-ym-panel" id="f_fo_panel"></div>
+            </div>
+          </div>
+          <div class="field field-locked">
+            <label>Is Temp Emp</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_isTempEmp_btn" disabled aria-disabled="true" title="Fixed scope — this dashboard excludes temporary employees">All</button>
+              <div class="filter-ym-panel" id="f_isTempEmp_panel"></div>
             </div>
           </div>
         </div>
@@ -1922,6 +1929,7 @@
       country: ["Work Location Country Name", "Country"],
       gender: ["Gender"],
       fo: ["FO?"],
+      isTempEmp: ["Is Temp Emp", "Is Temp Employee"],
       role: ["Role"],
       team: ["Team"],
       subTeam: ["Sub-Team","Sub Team"],
@@ -2036,7 +2044,7 @@
     // name, id, email, dates and numbers are deliberately excluded — they are
     // identifiers, not categories.
     const CATEGORICAL_FIELDS = ["businessView", "gcb", "dcmHc", "consolidatedRegion", "country",
-      "team", "subTeam", "movementType", "movementType2", "fo", "gender", "inOut", "role", "promoted"];
+      "team", "subTeam", "movementType", "movementType2", "fo", "isTempEmp", "gender", "inOut", "role", "promoted"];
 
     // Both columns hold movement categories drawn from the same vocabulary, so
     // anything counting or colouring movements reads them as one pool.
@@ -2101,7 +2109,7 @@
     // single source of truth: it drives what applyFilters applies, which
     // dropdowns get built, and which get wired — so a field absent here has
     // no control and no effect on the data.
-    const FILTER_FIELDS = ["year", "movementType", "movementType2", "businessView", "gender", "dcmHc", "gcb", "fo"];
+    const FILTER_FIELDS = ["year", "movementType", "movementType2", "businessView", "gender", "dcmHc", "gcb", "fo", "isTempEmp"];
     const SIMPLE_FILTER_FIELDS = FILTER_FIELDS;
 
     // The tail of the sidebar, hidden behind the key beside the "Filters"
@@ -2112,10 +2120,10 @@
     // reason — a filter left narrowed with no visible control would silently
     // shrink the dashboard.
     //
-    // FO/Non-FO is the exception that stays on screen throughout: it is listed
-    // here because unlocking hands it over to the reader (and locking pins it
-    // back), not because it is ever hidden.
-    const ADMIN_FILTER_FIELDS = ["businessView", "gender", "dcmHc", "gcb", "fo"];
+    // FO/Non-FO and Is Temp Emp are the exceptions that stay on screen
+    // throughout: they are listed here because unlocking hands them over to the
+    // reader (and locking pins them back), not because they are ever hidden.
+    const ADMIN_FILTER_FIELDS = ["businessView", "gender", "dcmHc", "gcb", "fo", "isTempEmp"];
 
     // A blank movement column is a real answer — "no movement of this kind that
     // year" — so it is offered as its own option rather than quietly dropped.
@@ -2188,17 +2196,25 @@
     // Filters the reader cannot change: they still filter the data and still
     // show their value in the sidebar, but are pinned to their default and
     // rendered read-only. FO/Non-FO is fixed to FO because the dashboard
-    // reports on front office headcount.
+    // reports on front office headcount, and Is Temp Emp to N because it
+    // reports on permanent headcount.
     //
     // The pin is a default, not a rule about the data, so it lifts once the
     // admin filters are unlocked — hence a function rather than a plain
     // set membership test. Everything that treats a field as locked (its
     // panel, its button, whether the cascade may reset it) goes through here,
     // so the two states cannot disagree.
-    const LOCKED_FILTER_FIELDS = new Set(["fo"]);
+    const LOCKED_FILTER_FIELDS = new Set(["fo", "isTempEmp"]);
     function isFieldLocked(field){
       return LOCKED_FILTER_FIELDS.has(field) && !adminFiltersUnlocked();
     }
+    // Why each pinned filter is pinned, shown on the disabled button while it
+    // is locked. Keyed by field so the two pins can't end up sharing one
+    // explanation.
+    const LOCKED_FIELD_TITLES = {
+      fo: "Fixed scope — this dashboard reports on Front Office staff",
+      isTempEmp: "Fixed scope — this dashboard excludes temporary employees"
+    };
     
     // Shared chart colours. The alias keeps the existing chart configuration
     // concise while the varied palette below restores the original visual style.
@@ -2469,21 +2485,27 @@
         .find(v => pattern.test(v));
       return match || "All";
     }
-    // Only FO/Non-FO resolves to a value now: it is pinned rather than merely
-    // defaulted (see LOCKED_FILTER_FIELDS), because the dashboard reports on
-    // front office headcount. Anchored so "Non-FO" cannot match. DCM HC? opens
-    // on "All" — it is an ordinary filter the reader chooses, not a scope the
-    // dashboard imposes.
+    // Two fields resolve to a value rather than "All": they are pinned rather
+    // than merely defaulted (see LOCKED_FILTER_FIELDS). FO/Non-FO because the
+    // dashboard reports on front office headcount, anchored so "Non-FO" cannot
+    // match; Is Temp Emp to N because it reports on permanent headcount,
+    // likewise anchored so "Y"/"Yes" cannot match. DCM HC? opens on "All" — it
+    // is an ordinary filter the reader chooses, not a scope the dashboard
+    // imposes.
     const FO_PATTERN = /^f[\/\s-]?o$/i;
     function resolveFoDefault(){ return resolveFilterDefault("fo", FO_PATTERN); }
+    const NON_TEMP_PATTERN = /^n(o)?$/i;
+    function resolveTempEmpDefault(){ return resolveFilterDefault("isTempEmp", NON_TEMP_PATTERN); }
 
     // Where every admin filter sits when nobody has touched it: wide open,
-    // apart from the pinned FO/Non-FO. Used both on a clear and when the
-    // filters are locked back away, so the two paths cannot drift apart.
+    // apart from the pinned FO/Non-FO and Is Temp Emp. Used both on a clear and
+    // when the filters are locked back away, so the two paths cannot drift
+    // apart.
     function adminFilterDefaults(){
       const defaults = {};
       for(const field of ADMIN_FILTER_FIELDS) defaults[field] = "All";
       defaults.fo = resolveFoDefault();
+      defaults.isTempEmp = resolveTempEmpDefault();
       return defaults;
     }
 
@@ -2548,7 +2570,7 @@
         if(btnEl){
           btnEl.disabled = locked;
           btnEl.setAttribute("aria-disabled", locked ? "true" : "false");
-          if(locked) btnEl.setAttribute("title", "Fixed scope — this dashboard reports on Front Office staff");
+          if(locked) btnEl.setAttribute("title", LOCKED_FIELD_TITLES[field] || "Fixed scope");
           else btnEl.removeAttribute("title");
         }
       }
@@ -4816,6 +4838,9 @@
           country: country,
           gender:pick(genders),
           fo:pick(fos),
+          // Mostly permanent staff, with enough temps that unlocking the pin
+          // visibly changes the numbers.
+          isTempEmp: rnd()<0.12 ? "Y" : "N",
           role:pick(roles),
           team:team,
           subTeam: pick (subTeams),

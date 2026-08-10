@@ -1697,6 +1697,13 @@
             </div>
           </div>
           <div class="field">
+            <label>Business View</label>
+            <div class="filter-ym-wrap">
+              <button type="button" class="filter-ym-btn" id="f_businessView_btn" aria-expanded="false" aria-controls="f_businessView_panel">All</button>
+              <div class="filter-ym-panel" id="f_businessView_panel"></div>
+            </div>
+          </div>
+          <div class="field">
             <label>Movement Type</label>
             <div class="filter-ym-wrap">
               <button type="button" class="filter-ym-btn" id="f_movementType_btn" aria-expanded="false" aria-controls="f_movementType_panel">All</button>
@@ -1719,13 +1726,6 @@
                always built and wired by the normal filter machinery) — only
                their visibility is gated. -->
           <div class="admin-divider admin-field">Admin Filters</div>
-          <div class="field admin-field">
-            <label>Business View</label>
-            <div class="filter-ym-wrap">
-              <button type="button" class="filter-ym-btn" id="f_businessView_btn" aria-expanded="false" aria-controls="f_businessView_panel">All</button>
-              <div class="filter-ym-panel" id="f_businessView_panel"></div>
-            </div>
-          </div>
           <div class="field admin-field">
             <label>Gender</label>
             <div class="filter-ym-wrap">
@@ -2109,7 +2109,7 @@
     // single source of truth: it drives what applyFilters applies, which
     // dropdowns get built, and which get wired — so a field absent here has
     // no control and no effect on the data.
-    const FILTER_FIELDS = ["year", "movementType", "movementType2", "businessView", "gender", "dcmHc", "gcb", "fo", "isTempEmp"];
+    const FILTER_FIELDS = ["year", "businessView", "movementType", "movementType2", "gender", "dcmHc", "gcb", "fo", "isTempEmp"];
     const SIMPLE_FILTER_FIELDS = FILTER_FIELDS;
 
     // The tail of the sidebar, hidden behind the key beside the "Filters"
@@ -2123,7 +2123,7 @@
     // FO/Non-FO and Is Temp Emp are the exceptions that stay on screen
     // throughout: they are listed here because unlocking hands them over to the
     // reader (and locking pins them back), not because they are ever hidden.
-    const ADMIN_FILTER_FIELDS = ["businessView", "gender", "dcmHc", "gcb", "fo", "isTempEmp"];
+    const ADMIN_FILTER_FIELDS = ["gender", "dcmHc", "gcb", "fo", "isTempEmp"];
 
     // A blank movement column is a real answer — "no movement of this kind that
     // year" — so it is offered as its own option rather than quietly dropped.
@@ -3185,6 +3185,7 @@
         // null on a multiselect means "not chosen yet", so the panel fills it
         // with its own default on the next render.
         movementType: null, movementType2: null,
+        businessView: "All",
         ...adminFilterDefaults()
       };
       state.teamChartSelectedTeams=null;

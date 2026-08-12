@@ -331,7 +331,7 @@
             </div>
           </div>
           <input type="file" id="ytdInput" accept=".xlsx,.xlsm,.xls,.csv">
-          <p class="hint">The left side of the join — every YTD row is kept. Needs <b>Year</b>, <b>Managed Region</b>, <b>Mastergroup</b>, <b>Mastergroup Code</b>, plus measure columns.</p>
+          <p class="hint">The base table — every row is kept and the column list comes from here. Needs <b>Year</b>, <b>Managed Region</b>, <b>Mastergroup</b>, <b>Mastergroup Code</b>, plus measure columns.</p>
         </div>
 
         <div>
@@ -348,7 +348,7 @@
             </div>
           </div>
           <input type="file" id="mtdInput" accept=".xlsx,.xlsm,.xls,.csv">
-          <p class="hint">Looked up against YTD on the same four key columns. Non-matching MTD rows are ignored.</p>
+          <p class="hint">Supplies <b>Utilisation ($M)</b> and <b>Limit ($M)</b> for the latest year only, matched on the same four key columns. Earlier years keep their YTD values.</p>
         </div>
 
         <div>
@@ -564,10 +564,13 @@ var PRIORITY_COL     = "Priority";
 var PRIORITY_OUT_COL = "Priority";
 var EXCEL_MAX_ROWS   = 1048576;   // hard Excel sheet limit, header included
 
-/* The Omnia table is built here: YTD left-joined with MTD on these four columns.
-   An MTD column whose name already exists in YTD is carried across with MTD_SUFFIX. */
-var JOIN_KEYS  = ["Year", "Managed Region", KEY_OMNIA_NAME, KEY_OMNIA_CODE];
-var MTD_SUFFIX = " MTD";
+/* The Omnia table is built here: YTD rows of the latest year are looked up in MTD
+   on these four columns, and only MTD_REPLACE_COLS are overwritten from MTD.
+   Rows of any other year pass through untouched, and no columns are added. */
+var JOIN_KEYS        = ["Year", "Managed Region", KEY_OMNIA_NAME, KEY_OMNIA_CODE];
+var YEAR_COL         = "Year";
+var MTD_REPLACE_COLS = ["Utilisation ($M)", "Limit ($M)"];
+var MTD_NO_MATCH     = 0;   // latest-year row with no MTD row: replace value with this
 
 var ZERO_WIDTH_RE = /[\u200b-\u200d\ufeff]/g;
 
@@ -737,14 +740,17 @@ function sheetToTable(wb, sheetName){
 }
 
 /* =====================================================================
-   Build the Omnia table: Omnia YTD left-joined with Omnia MTD
-   Key: Year + Managed Region + Mastergroup + Mastergroup Code.
-   Every YTD row survives; unmatched rows get blanks in the MTD columns.
+   Build the Omnia table from Omnia YTD + Omnia MTD
+   Only rows of the LATEST year in the YTD file are looked up in MTD, on
+   Year + Managed Region + Mastergroup + Mastergroup Code. For those rows the
+   MTD_REPLACE_COLS values are overwritten from MTD; a latest-year row with no
+   MTD match gets MTD_NO_MATCH. Every other year passes through untouched.
+   The column list is exactly the YTD column list — nothing is added.
    ===================================================================== */
 function joinKeyNorm(col, v){
   // Year and Mastergroup Code are code-like (strip spaces and a trailing .0);
   // Managed Region and Mastergroup are free text.
-  return (col === "Year" || col === KEY_OMNIA_CODE) ? normCode(v) : normName(v);
+  return (col === YEAR_COL || col === KEY_OMNIA_CODE) ? normCode(v) : normName(v);
 }
 
 function compositeKey(row, idx){
@@ -757,55 +763,80 @@ function compositeKey(row, idx){
   return parts.join("");
 }
 
+/* Latest year = the largest distinct Year in the YTD file. Compared numerically
+   when every year parses as a number, otherwise as text (e.g. "FY26"). */
+function latestYearOf(tbl, iYear){
+  var seen = Object.create(null), keys = [], raw = Object.create(null);
+  for (var r = 0; r < tbl.rows.length; r++){
+    var k = normCode(tbl.rows[r][iYear]);
+    if (k === null || seen[k]) continue;
+    seen[k] = true; keys.push(k); raw[k] = tbl.rows[r][iYear];
+  }
+  if (!keys.length) return null;
+  var allNum = keys.every(function(k){ return k !== "" && isFinite(Number(k)); });
+  var best = keys.reduce(allNum
+    ? function(a, b){ return Number(b) > Number(a) ? b : a; }
+    : function(a, b){ return b > a ? b : a; });
+  return {key: best, label: String(raw[best]), years: keys.length};
+}
+
 function joinYtdMtd(ytd, mtd){
   [["Omnia YTD", ytd], ["Omnia MTD", mtd]].forEach(function(p){
     var miss = JOIN_KEYS.filter(function(c){ return p[1].columns.indexOf(c) === -1; });
     if (miss.length) throw new Error(p[0] + " is missing join column(s): " + miss.join(", "));
+    var missR = MTD_REPLACE_COLS.filter(function(c){ return p[1].columns.indexOf(c) === -1; });
+    if (missR.length) throw new Error(p[0] + " is missing the column(s) to replace: " + missR.join(", "));
   });
 
-  var yIdx = JOIN_KEYS.map(function(c){ return ytd.columns.indexOf(c); });
-  var mIdx = JOIN_KEYS.map(function(c){ return mtd.columns.indexOf(c); });
+  var yIdx  = JOIN_KEYS.map(function(c){ return ytd.columns.indexOf(c); });
+  var mIdx  = JOIN_KEYS.map(function(c){ return mtd.columns.indexOf(c); });
+  var iYear = ytd.columns.indexOf(YEAR_COL);
 
-  // Everything in MTD except the key columns is carried across, renamed on collision.
-  var taken = ytd.columns.slice(), carry = [];
-  mtd.columns.forEach(function(name, i){
-    if (JOIN_KEYS.indexOf(name) !== -1) return;
-    var out = name;
-    if (taken.indexOf(out) !== -1){
-      out = name + MTD_SUFFIX;
-      for (var n = 2; taken.indexOf(out) !== -1; n++) out = name + MTD_SUFFIX + " (" + n + ")";
-    }
-    taken.push(out);
-    carry.push({at: i, name: out, from: name, renamed: out !== name});
+  // Pairs of (index in YTD row, index in MTD row) for the columns being replaced.
+  var repl = MTD_REPLACE_COLS.map(function(c){
+    return {name: c, to: ytd.columns.indexOf(c), from: mtd.columns.indexOf(c)};
   });
 
-  // Index MTD by key — first row for a key wins, later ones are counted and skipped.
-  var index = new Map(), dupRows = 0, blankKeyRows = 0;
+  var latest = latestYearOf(ytd, iYear);
+  if (!latest) throw new Error("Omnia YTD has no readable " + YEAR_COL + " values.");
+
+  // Index only the MTD rows of the latest year — no other row can ever match.
+  var index = new Map(), dupRows = 0, blankKeyRows = 0, otherYearMtd = 0;
+  var iMtdYear = mtd.columns.indexOf(YEAR_COL);
   for (var r = 0; r < mtd.rows.length; r++){
+    if (normCode(mtd.rows[r][iMtdYear]) !== latest.key){ otherYearMtd++; continue; }
     var mk = compositeKey(mtd.rows[r], mIdx);
     if (mk === null){ blankKeyRows++; continue; }
     if (index.has(mk)){ dupRows++; continue; }
     index.set(mk, mtd.rows[r]);
   }
 
-  var columns = ytd.columns.concat(carry.map(function(c){ return c.name; }));
-  var rows = new Array(ytd.rows.length), matched = 0;
+  var rows = new Array(ytd.rows.length);
+  var latestRows = 0, replaced = 0, zeroed = 0, otherYearRows = 0;
   for (var i = 0; i < ytd.rows.length; i++){
-    var src = ytd.rows[i];
-    var yk  = compositeKey(src, yIdx);
+    var row = ytd.rows[i].slice();
+    if (normCode(row[iYear]) !== latest.key){ otherYearRows++; rows[i] = row; continue; }
+
+    latestRows++;
+    var yk  = compositeKey(row, yIdx);
     var hit = yk === null ? undefined : index.get(yk);
-    if (hit) matched++;
-    var row = src.slice();
-    for (var c = 0; c < carry.length; c++){
-      var v = hit ? hit[carry[c].at] : null;
-      row.push(v === undefined ? null : v);
+    for (var c = 0; c < repl.length; c++){
+      if (hit){
+        var v = hit[repl[c].from];
+        row[repl[c].to] = v === undefined ? null : v;
+      } else {
+        row[repl[c].to] = MTD_NO_MATCH;
+      }
     }
+    if (hit) replaced++; else zeroed++;
     rows[i] = row;
   }
 
   return {
-    columns: columns, rows: rows, carry: carry,
-    matched: matched, unmatched: ytd.rows.length - matched,
+    columns: ytd.columns.slice(), rows: rows,
+    latest: latest, replacedCols: MTD_REPLACE_COLS.slice(),
+    latestRows: latestRows, replaced: replaced, zeroed: zeroed,
+    otherYearRows: otherYearRows, otherYearMtd: otherYearMtd,
     dupRows: dupRows, blankKeyRows: blankKeyRows, mtdKeys: index.size
   };
 }
@@ -1024,7 +1055,7 @@ async function run(){
     log("Mapping: " + state.map.fileName + " [" + state.map.sheetName + "] — " + fmt(state.map.rows.length) + " rows.");
     await yieldUI();
 
-    log("Building the Omnia file — left join on " + JOIN_KEYS.join(" + ") + "…", "step");
+    log("Building the Omnia file…", "step");
     var j = joinYtdMtd(state.ytd, state.mtd);
     state.omnia = {
       fileName:  state.ytd.fileName + " + " + state.mtd.fileName,
@@ -1032,27 +1063,22 @@ async function run(){
       columns:   j.columns,
       rows:      j.rows
     };
-    log("MTD indexed on " + fmt(j.mtdKeys) + " distinct key(s).");
+    log("Latest year in Omnia YTD: " + j.latest.label + " (of " + j.latest.years + " distinct year(s)).");
+    log("Taking " + j.replacedCols.join(" and ") + " from MTD for " + j.latest.label +
+        " only, matched on " + JOIN_KEYS.join(" + ") + ".");
+    log("MTD indexed on " + fmt(j.mtdKeys) + " " + j.latest.label + " key(s)" +
+        (j.otherYearMtd ? "; " + fmt(j.otherYearMtd) + " MTD row(s) of other years ignored." : "."));
     if (j.dupRows)      log(fmt(j.dupRows) + " MTD row(s) repeated a key already seen — first match used.", "warn");
     if (j.blankKeyRows) log(fmt(j.blankKeyRows) + " MTD row(s) had a blank key part and can never match — ignored.", "warn");
-    log("Joined: " + fmt(j.matched) + " of " + fmt(state.ytd.rows.length) + " YTD row(s) matched MTD, " +
-        fmt(j.unmatched) + " left blank.", j.unmatched ? "warn" : "ok");
-    var renamed = j.carry.filter(function(c){ return c.renamed; });
-    log("Carried " + j.carry.length + " MTD column(s) across" +
-        (renamed.length ? ", " + renamed.length + " renamed: " + renamed.map(function(c){ return c.name; }).join(" | ") : "") + ".");
+    log(j.latest.label + " rows: " + fmt(j.replaced) + " of " + fmt(j.latestRows) + " matched MTD — values replaced.",
+        j.replaced ? "ok" : "warn");
+    if (j.zeroed) log(fmt(j.zeroed) + " " + j.latest.label + " row(s) had no MTD match — " +
+                      j.replacedCols.join(" and ") + " set to " + MTD_NO_MATCH + ".", "warn");
+    log(fmt(j.otherYearRows) + " row(s) of earlier years kept exactly as they are in YTD.");
     log("Omnia file built: " + fmt(j.rows.length) + " rows, " + j.columns.length + " columns.", "ok");
     await yieldUI();
 
-    // A measure listed by the user is apportioned alongside its MTD twin, when the join produced one.
-    var twins = [];
-    measureCols.slice().forEach(function(c){
-      var t = c + MTD_SUFFIX;
-      if (state.omnia.columns.indexOf(t) !== -1 && measureCols.indexOf(t) === -1){
-        measureCols.push(t); twins.push(t);
-      }
-    });
     log("Measures: " + measureCols.join(" | "));
-    if (twins.length) log("Included " + twins.length + " MTD twin column(s) automatically: " + twins.join(" | ") + ".");
     await yieldUI();
 
     log("Preparing sponsor mapping…", "step");

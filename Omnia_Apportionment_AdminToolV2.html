@@ -270,6 +270,7 @@
 
   code{font-family:var(--mono);font-size:12px;background:#f1f3f7;border-radius:5px;padding:1px 6px}
   #embedCard .stats{margin-top:0}
+  .period{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 
   @media (max-width:1180px){
     .grid{grid-template-columns:1fr}
@@ -485,7 +486,8 @@
       <p class="hint" style="margin:0 0 20px;max-width:88ch">The output is written as
         <code>const OMNIA_COL_JSON_GZ_B64</code> — columnar JSON (one key per column, each holding that
         column's values) gzipped, then Base64. An existing constant is replaced in place; if there isn't
-        one, it is inserted on the line directly above <code>const OMNIA_COL_JSON</code>.</p>
+        one, it is inserted on the line directly above <code>const OMNIA_COL_JSON</code>.
+        The reporting period below is written into <code>const monthNumber</code> and <code>const year</code>.</p>
 
       <div class="two-col">
         <div>
@@ -501,7 +503,19 @@
           <p class="hint">Run apportioning first — embedding stays disabled until there is output to write.</p>
         </div>
         <div>
-          <span class="field-label">Payload</span>
+          <div class="period">
+            <div>
+              <label class="field-label" for="embedMonth"><span class="step">9</span>Month</label>
+              <select id="embedMonth"></select>
+            </div>
+            <div>
+              <label class="field-label" for="embedYear"><span class="step">10</span>Year</label>
+              <select id="embedYear"></select>
+            </div>
+          </div>
+          <p class="hint">Written into the dashboard as <code>const monthNumber</code> and <code>const year</code>.</p>
+
+          <span class="field-label" style="margin-top:20px">Payload</span>
           <div class="stats">
             <div class="stat">
               <span class="stat-ico i-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></span>
@@ -1288,6 +1302,7 @@ function resetAll(){
   $("tplName").className = "file-name";
   $("tplName").textContent = "No file chosen";
   $("sJsonSize").textContent = "—"; $("sB64Size").textContent = "—";
+  resetPeriod();
   [["ytdDrop","ytdName","ytdSheetWrap"],["mtdDrop","mtdName","mtdSheetWrap"],["mapDrop","mapName","mapSheetWrap"]].forEach(function(t){
     $(t[0]).className = "drop";
     $(t[1]).className = "file-name";
@@ -1368,6 +1383,27 @@ function patchHtml(html, b64){
   };
 }
 
+var MONTHS = ["January","February","March","April","May","June",
+              "July","August","September","October","November","December"];
+var PERIOD_YEARS = {from: 2020, to: 2050};
+
+/* Rewrites the right-hand side of an existing "const <name> = ..." declaration,
+   keeping the declaration keyword, the name and any trailing comment. The
+   dashboard is expected to already carry these two, so a miss is reported
+   rather than invented. */
+function patchConstNumber(html, name, value){
+  var find = new RegExp("((?:const|let|var)\\s+" + name + "\\s*=\\s*)([^;\\n]*)(;?)");
+  var all  = new RegExp("(?:const|let|var)\\s+" + name + "\\s*=", "g");
+  var m = find.exec(html);
+  if (!m) return {text: html, found: false, count: 0, was: null};
+  return {
+    text:  html.replace(find, function(_, head, old, semi){ return head + value + (semi || ";"); }),
+    found: true,
+    count: (html.match(all) || []).length,
+    was:   m[2].trim()
+  };
+}
+
 function saveText(text, fileName){
   var url = URL.createObjectURL(new Blob([text], {type:"text/html;charset=utf-8"}));
   var a = document.createElement("a");
@@ -1395,7 +1431,20 @@ function embed(){
     return gzipBytes(raw).then(function(gz){
       var b64 = bytesToB64(gz);
       var res = patchHtml(state.tpl.text, b64);
-      saveText(res.text, state.tpl.fileName);
+
+      var month = Number($("embedMonth").value), yr = Number($("embedYear").value);
+      var pm = patchConstNumber(res.text, "monthNumber", month);
+      var py = patchConstNumber(pm.text, "year", yr);
+      [["monthNumber", pm, month], ["year", py, yr]].forEach(function(p){
+        var nm = p[0], r = p[1], v = p[2];
+        if (!r.found){
+          log("Embed: no \"const " + nm + " =\" found in " + state.tpl.fileName + " — left unchanged.", "warn");
+        } else {
+          log("Embed: const " + nm + " = " + v + (r.was === String(v) ? " (unchanged)" : " (was " + r.was + ")") + ".");
+          if (r.count > 1) log("Embed: " + nm + " is declared " + r.count + " times — only the first was rewritten.", "warn");
+        }
+      });
+      saveText(py.text, state.tpl.fileName);
 
       $("sJsonSize").textContent = kb(raw.length);
       $("sB64Size").textContent  = kb(b64.length);
@@ -1403,7 +1452,8 @@ function embed(){
         " (" + (100 - gz.length / raw.length * 100).toFixed(1) + "% smaller), Base64 " + kb(b64.length) + ".";
       log("Embed: constant " + res.mode + " in " + state.tpl.fileName + " — gzip " + kb(gz.length) +
           ", Base64 " + kb(b64.length) + ". Saved.", "ok");
-      banner("Dashboard written: " + state.tpl.fileName + " (constant " + res.mode + ").", "ok");
+      banner("Dashboard written: " + state.tpl.fileName + " — data " + res.mode + ", period set to " +
+             MONTHS[month - 1] + " " + yr + ".", "ok");
     });
   }).catch(function(err){
     var msg = err && err.message ? err.message : String(err);
@@ -1462,6 +1512,29 @@ function wireTemplate(){
   }
 }
 
+function initPeriod(){
+  var m = $("embedMonth"), y = $("embedYear"), now = new Date();
+  MONTHS.forEach(function(name, i){
+    var o = document.createElement("option");
+    o.value = String(i + 1); o.textContent = name;
+    m.appendChild(o);
+  });
+  for (var yr = PERIOD_YEARS.from; yr <= PERIOD_YEARS.to; yr++){
+    var o2 = document.createElement("option");
+    o2.value = String(yr); o2.textContent = String(yr);
+    y.appendChild(o2);
+  }
+  resetPeriod();
+}
+
+/* Defaults to today. If the clock ever runs past the year list, clamp to its end
+   so the select can never show a year that does not match its value. */
+function resetPeriod(){
+  var now = new Date();
+  $("embedMonth").value = String(now.getMonth() + 1);
+  $("embedYear").value  = String(Math.min(Math.max(now.getFullYear(), PERIOD_YEARS.from), PERIOD_YEARS.to));
+}
+
 function refreshEmbed(){
   $("embedBtn").disabled = !(state.out && state.tpl);
   if (!state.tpl)      $("embedNote").textContent = "No dashboard file loaded yet.";
@@ -1488,6 +1561,7 @@ wireFile("map", {
 });
 
 wireTemplate();
+initPeriod();
 
 $("runBtn").addEventListener("click", run);
 $("dlBtn").addEventListener("click", download);

@@ -263,7 +263,7 @@
       gap: 8px;
     }
 
-    /* Red by default (sample data / no file loaded yet); green only once a
+    /* Red by default (no file loaded yet); green only once a
        real Excel file has been loaded, toggled via the .status.is-loaded class. */
     .status::before {
       content: "";
@@ -4689,7 +4689,7 @@
         const rows=XLSX.utils.sheet_to_json(sheet, {defval:null,raw:true});
         const norm = normalizeRows(rows);
         if(!norm.length) { setStatus(`Loaded ${file.name} but no usable rows were found. Ensure HC sheet is the 1st sheet in workbook & the columns names are correct. `); return; }
-        loadData(norm, file.name, false);
+        loadData(norm, file.name);
       }catch(e){
         // Legacy "Standard"/RC4 encryption reaches here (SheetJS throws a
         // password error we can't satisfy) — surface it rather than looping.
@@ -4782,15 +4782,14 @@
     }
 
     // Load data into dashboard
-    function loadData(records, name, isSample){
+    function loadData(records, name){
       state.raw = records;
       state.categoryColorOrders = {};
       clearFilters();
-      if(isSample) setStatus("Please select an Excel file to begin. (Showing sample data)");
-      else setStatus(`Loaded: ${name} (${state.raw.length.toLocaleString()} rows)`, true);
+      setStatus(`Loaded: ${name} (${state.raw.length.toLocaleString()} rows)`, true);
     }
 
-    // Sample data
+    // Dashboard data is supplied from a user-selected Excel file.
     let _seed=987654321;
     function rnd(){ _seed=(_seed*1103515245+12345)%0x7fffffff; return _seed/0x7fffffff; }
     function pick(a){ return a [Math.floor(rnd()*a.length)]; }
@@ -4866,10 +4865,6 @@
       }
       return rows;
     }
-
-    // Sample rows skip normalizeRows (they are already in the internal shape),
-    // so canonicalise them directly to keep both paths identical.
-    const sampleData = canonicalizeCategories(buildSampleData());
 
     // Wiring
     function wireEvents(){
@@ -5018,11 +5013,8 @@
       };
       wireEvents();
 
-      if(!("showOpenFilePicker" in window)){
-        setStatus("Auto-reload needs Chrome or Edge. You can still select a file manually. (Showing sample data)");
-      }
-      // demo with sample data first
-      loadData (sampleData, "(sample data)", true);
+      setStatus("Select an Excel file to begin.");
+      clearFilters();
       // then attempt to restore a previously selected file
       await tryRestoreHandle();
     }

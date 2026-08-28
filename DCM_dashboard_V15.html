@@ -797,21 +797,10 @@
 
     /* These adjacent cards intentionally use independent plot heights: the
        location chart grows with its country count, while Other Teams keeps
-       its standard chart height. The explicit flex basis prevents Chart.js's
-       previous canvas size from preserving a stretched grid-row height. */
-    .grid2 > .chart-card-other-teams,
-    .grid2 > .chart-card-location {
-      align-self: flex-start;
-      height: auto;
-    }
-
-    .grid2 > .chart-card.chart-card-other-teams .chart-box {
-      flex: 0 0 300px;
-      height: 300px;
-    }
-
-    .grid2 > .chart-card.chart-card-location .chart-box-country {
-      flex: 0 0 auto;
+       its standard chart height. */
+    .chart-card-other-teams,
+    .chart-card-location {
+      align-self: start;
     }
     
     .chart-card .c-title {

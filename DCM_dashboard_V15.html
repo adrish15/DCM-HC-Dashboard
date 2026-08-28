@@ -794,6 +794,25 @@
     /* A chart that straddles both grid columns (Origination Team sub-teams),
        so it gets the full dashboard width on a row of its own. */
     .chart-card-full { grid-column: 1 / -1; }
+
+    /* These adjacent cards intentionally use independent plot heights: the
+       location chart grows with its country count, while Other Teams keeps
+       its standard chart height. The explicit flex basis prevents Chart.js's
+       previous canvas size from preserving a stretched grid-row height. */
+    .grid2 > .chart-card-other-teams,
+    .grid2 > .chart-card-location {
+      align-self: flex-start;
+      height: auto;
+    }
+
+    .grid2 > .chart-card.chart-card-other-teams .chart-box {
+      flex: 0 0 300px;
+      height: 300px;
+    }
+
+    .grid2 > .chart-card.chart-card-location .chart-box-country {
+      flex: 0 0 auto;
+    }
     
     .chart-card .c-title {
       font-size: 15px;
@@ -1855,7 +1874,7 @@
             </div>
             <div class="chart-box tall"><canvas id="c_team_years_origination"></canvas></div>
           </div>
-          <div class="chart-card">
+          <div class="chart-card chart-card-other-teams">
             <div class="c-title">
               <span>Head Count Split - Other Teams</span>
               <span class="c-title-controls">
@@ -1872,7 +1891,7 @@
             </div>
             <div class="chart-box"><canvas id="c_team_years"></canvas></div>
           </div>
-          <div class="chart-card">
+          <div class="chart-card chart-card-location">
             <div class="c-title">
               <span>Head Count - by Location</span>
               <span class="c-title-controls">
